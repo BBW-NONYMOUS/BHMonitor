@@ -1,0 +1,154 @@
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { cn } from '@/lib/utils';
+import {
+    LayoutDashboard, Users, Building2, Map, UserCog,
+    FileText, LogOut, X, Home, Search, MessageSquare
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+const navItems = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'owner'] },
+    { to: '/students', label: 'Students', icon: Users, roles: ['admin', 'owner'] },
+    { to: '/boarding-houses', label: 'Boarding Houses', icon: Building2, roles: ['admin', 'owner'] },
+    { to: '/boarding-houses/map', label: 'Map View', icon: Map, roles: ['admin', 'owner'] },
+    { to: '/inquiries', label: 'Inquiries', icon: MessageSquare, roles: ['admin', 'owner'], showBadge: true },
+    { to: '/owners', label: 'Owners', icon: UserCog, roles: ['admin'] },
+    {
+        label: 'Reports', icon: FileText, roles: ['admin', 'owner'],
+        children: [
+            { to: '/reports/students', label: 'Students' },
+            { to: '/reports/boarding-houses', label: 'Boarding Houses' },
+            { to: '/reports/occupancy', label: 'Occupancy' },
+            { to: '/reports/geo', label: 'Geo Report' },
+        ]
+    },
+];
+
+export default function Sidebar({ open, onClose }) {
+    const { user, logout } = useAuth();
+    const { unreadCount } = useNotifications();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        await logout();
+        toast.success('Logged out successfully.');
+        navigate('/login');
+    };
+
+    const filtered = navItems.filter(item => !item.roles || item.roles.includes(user?.role));
+
+    return (
+        <>
+            {/* Overlay */}
+            {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} />}
+
+            <aside className={cn(
+                'fixed top-0 left-0 z-40 h-full w-64 bg-slate-900 text-slate-100 flex flex-col transition-transform duration-300',
+                open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            )}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-5 border-b border-slate-700">
+                    <div className="flex items-center gap-2">
+                        <Home className="h-6 w-6 text-blue-400" />
+                        <div>
+                            <p className="text-sm font-bold leading-tight text-white">Boarders</p>
+                            <p className="text-xs text-slate-400">Monitoring System</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-white">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Nav */}
+                <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+                    {filtered.map((item) => {
+                        if (item.children) {
+                            return (
+                                <div key={item.label}>
+                                    <div className="flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider text-slate-400 font-semibold mt-2">
+                                        <item.icon className="h-4 w-4" />
+                                        {item.label}
+                                    </div>
+                                    <div className="ml-2 space-y-0.5">
+                                        {item.children.map(child => (
+                                            <NavLink
+                                                key={child.to}
+                                                to={child.to}
+                                                onClick={onClose}
+                                                className={({ isActive }) => cn(
+                                                    'block rounded-md px-4 py-2 text-sm transition-colors',
+                                                    isActive
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                                )}
+                                            >
+                                                {child.label}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                onClick={onClose}
+                                className={({ isActive }) => cn(
+                                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                                    isActive
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                )}
+                            >
+                                <item.icon className="h-4 w-4 shrink-0" />
+                                {item.label}
+                                {item.showBadge && unreadCount > 0 && (
+                                    <span className="ml-auto bg-red-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
+                            </NavLink>
+                        );
+                    })}
+
+                    {/* Public Finder */}
+                    <NavLink
+                        to="/find-boarding"
+                        target="_blank"
+                        rel="noopener"
+                        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+                    >
+                        <Search className="h-4 w-4 shrink-0" />
+                        Find Boarding
+                    </NavLink>
+                </nav>
+
+                {/* User */}
+                <div className="border-t border-slate-700 p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                            {user?.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                            <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                    </button>
+                </div>
+            </aside>
+        </>
+    );
+}
