@@ -7,9 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { 
+import {
     MessageCircle, Mail, Phone, Clock, Building2,
-    CheckCircle, XCircle, AlertCircle, Filter, RefreshCw, ExternalLink
+    CheckCircle, XCircle, AlertCircle, Filter, RefreshCw
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -22,7 +22,7 @@ const STATUS_CONFIG = {
 
 export default function AllInquiriesPage() {
     const navigate = useNavigate();
-    const { fetchNotifications, fetchUnreadCount } = useNotifications();
+    const { fetchUnreadCount } = useNotifications();
     const [inquiries, setInquiries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -48,10 +48,9 @@ export default function AllInquiriesPage() {
         setUpdating(inquiryId);
         try {
             await api.put(`/student-inquiries/${inquiryId}`, { status: newStatus });
-            setInquiries(prev => prev.map(inq => 
+            setInquiries((prev) => prev.map((inq) =>
                 inq.id === inquiryId ? { ...inq, status: newStatus } : inq
             ));
-            // Refresh notifications when inquiry status changes
             fetchUnreadCount();
         } catch (err) {
             console.error('Failed to update status', err);
@@ -60,42 +59,41 @@ export default function AllInquiriesPage() {
         }
     };
 
-    const filteredInquiries = filter === 'all' 
-        ? inquiries 
-        : inquiries.filter(inq => inq.status === filter);
+    const filteredInquiries = filter === 'all'
+        ? inquiries
+        : inquiries.filter((inq) => inq.status === filter);
 
     const counts = {
         all: inquiries.length,
-        pending: inquiries.filter(i => i.status === 'pending').length,
-        contacted: inquiries.filter(i => i.status === 'contacted').length,
-        approved: inquiries.filter(i => i.status === 'approved').length,
+        pending: inquiries.filter((i) => i.status === 'pending').length,
+        contacted: inquiries.filter((i) => i.status === 'contacted').length,
+        approved: inquiries.filter((i) => i.status === 'approved').length,
     };
 
     if (loading) {
         return (
             <div className="flex justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
             </div>
         );
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="mx-auto max-w-6xl space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">All Inquiries</h1>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="mt-1 text-sm text-slate-500">
                         View and manage all student inquiries across your boarding houses
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={fetchInquiries}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={fetchInquiries} className="w-full sm:w-auto">
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
                 </Button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card className="cursor-pointer hover:border-blue-200" onClick={() => setFilter('all')}>
                     <CardContent className="p-4">
                         <p className="text-2xl font-bold text-slate-900">{counts.all}</p>
@@ -122,11 +120,10 @@ export default function AllInquiriesPage() {
                 </Card>
             </div>
 
-            {/* Filter */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Filter className="h-4 w-4 text-slate-400" />
                 <Select value={filter} onValueChange={setFilter}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full sm:w-40">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -140,11 +137,10 @@ export default function AllInquiriesPage() {
                 </Select>
             </div>
 
-            {/* Inquiries List */}
             {filteredInquiries.length === 0 ? (
                 <Card>
-                    <CardContent className="text-center py-12 text-slate-400">
-                        <MessageCircle className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                    <CardContent className="py-12 text-center text-slate-400">
+                        <MessageCircle className="mx-auto mb-3 h-10 w-10 opacity-40" />
                         <p>No inquiries found.</p>
                     </CardContent>
                 </Card>
@@ -164,26 +160,22 @@ export default function AllInquiriesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredInquiries.map(inq => {
+                                {filteredInquiries.map((inq) => {
                                     const StatusIcon = STATUS_CONFIG[inq.status]?.icon || Clock;
                                     return (
                                         <TableRow key={inq.id}>
                                             <TableCell>
                                                 <div>
                                                     <p className="font-medium">{inq.full_name}</p>
-                                                    {inq.student_no && (
-                                                        <p className="text-xs text-slate-400">{inq.student_no}</p>
-                                                    )}
-                                                    {inq.course && (
-                                                        <p className="text-xs text-slate-400">{inq.course} - {inq.year_level}</p>
-                                                    )}
+                                                    {inq.student_no && <p className="text-xs text-slate-400">{inq.student_no}</p>}
+                                                    {inq.course && <p className="text-xs text-slate-400">{inq.course} - {inq.year_level}</p>}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Building2 className="h-4 w-4 text-slate-400" />
-                                                    <span 
-                                                        className="text-blue-600 hover:underline cursor-pointer"
+                                                    <span
+                                                        className="cursor-pointer text-blue-600 hover:underline"
                                                         onClick={() => navigate(`/boarding-houses/${inq.boarding_house_id}`)}
                                                     >
                                                         {inq.boarding_house?.boarding_name || 'Unknown'}
@@ -194,29 +186,25 @@ export default function AllInquiriesPage() {
                                                 <div className="space-y-1 text-sm">
                                                     <p className="flex items-center gap-1">
                                                         <Mail className="h-3 w-3 text-slate-400" />
-                                                        <a href={`mailto:${inq.email}`} className="text-blue-600 hover:underline">
-                                                            {inq.email}
-                                                        </a>
+                                                        <a href={`mailto:${inq.email}`} className="text-blue-600 hover:underline">{inq.email}</a>
                                                     </p>
                                                     <p className="flex items-center gap-1">
                                                         <Phone className="h-3 w-3 text-slate-400" />
-                                                        <a href={`tel:${inq.contact_number}`} className="text-blue-600 hover:underline">
-                                                            {inq.contact_number}
-                                                        </a>
+                                                        <a href={`tel:${inq.contact_number}`} className="text-blue-600 hover:underline">{inq.contact_number}</a>
                                                     </p>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="text-sm space-y-1">
+                                                <div className="space-y-1 text-sm">
                                                     {inq.gender && <Badge variant="outline">{inq.gender}</Badge>}
                                                     {inq.budget > 0 && (
-                                                        <p className="text-xs text-slate-500">Budget: ₱{Number(inq.budget).toLocaleString()}</p>
+                                                        <p className="text-xs text-slate-500">Budget: P{Number(inq.budget).toLocaleString()}</p>
                                                     )}
                                                     {inq.move_in_date && (
                                                         <p className="text-xs text-slate-500">Move-in: {new Date(inq.move_in_date).toLocaleDateString()}</p>
                                                     )}
                                                     {inq.message && (
-                                                        <p className="text-xs text-slate-400 truncate max-w-[150px]" title={inq.message}>
+                                                        <p className="max-w-[150px] truncate text-xs text-slate-400" title={inq.message}>
                                                             "{inq.message}"
                                                         </p>
                                                     )}
@@ -229,20 +217,16 @@ export default function AllInquiriesPage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <p className="text-sm text-slate-500">
-                                                    {new Date(inq.created_at).toLocaleDateString()}
-                                                </p>
-                                                <p className="text-xs text-slate-400">
-                                                    {new Date(inq.created_at).toLocaleTimeString()}
-                                                </p>
+                                                <p className="text-sm text-slate-500">{new Date(inq.created_at).toLocaleDateString()}</p>
+                                                <p className="text-xs text-slate-400">{new Date(inq.created_at).toLocaleTimeString()}</p>
                                             </TableCell>
                                             <TableCell>
-                                                <Select 
-                                                    value={inq.status} 
+                                                <Select
+                                                    value={inq.status}
                                                     onValueChange={(v) => updateStatus(inq.id, v)}
                                                     disabled={updating === inq.id}
                                                 >
-                                                    <SelectTrigger className="w-32 h-8 text-xs">
+                                                    <SelectTrigger className="h-8 w-32 text-xs">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>

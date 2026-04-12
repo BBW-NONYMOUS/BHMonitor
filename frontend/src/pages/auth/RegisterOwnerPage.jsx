@@ -24,9 +24,9 @@ export default function RegisterOwnerPage() {
     const [errors, setErrors] = useState({});
 
     const handleChange = (field) => (e) => {
-        setForm(prev => ({ ...prev, [field]: e.target.value }));
+        setForm((prev) => ({ ...prev, [field]: e.target.value }));
         if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }));
+            setErrors((prev) => ({ ...prev, [field]: null }));
         }
     };
 
@@ -51,18 +51,16 @@ export default function RegisterOwnerPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center p-4">
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-blue-900 p-4">
             <div className="w-full max-w-lg">
-                {/* Back to Home */}
-                <Link to="/" className="inline-flex items-center text-blue-300 hover:text-white mb-6 transition-colors">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+                <Link to="/" className="mb-6 inline-flex items-center text-blue-300 transition-colors hover:text-white">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to Home
                 </Link>
 
-                {/* Logo */}
-                <div className="flex justify-center mb-8">
+                <div className="mb-8 flex justify-center">
                     <div className="flex items-center gap-3 text-white">
-                        <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
                             <Home className="h-6 w-6" />
                         </div>
                         <div>
@@ -81,13 +79,12 @@ export default function RegisterOwnerPage() {
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Account Information */}
                             <div className="space-y-4">
-                                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+                                <h3 className="text-sm font-medium uppercase tracking-wide text-slate-500">
                                     Account Information
                                 </h3>
-                                
-                                <div className="grid grid-cols-2 gap-4">
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label htmlFor="name">Username</Label>
                                         <Input
@@ -113,13 +110,13 @@ export default function RegisterOwnerPage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label htmlFor="password">Password</Label>
                                         <Input
                                             id="password"
                                             type="password"
-                                            placeholder="••••••••"
+                                            placeholder="Enter password"
                                             value={form.password}
                                             onChange={handleChange('password')}
                                             required
@@ -131,7 +128,7 @@ export default function RegisterOwnerPage() {
                                         <Input
                                             id="password_confirmation"
                                             type="password"
-                                            placeholder="••••••••"
+                                            placeholder="Confirm password"
                                             value={form.password_confirmation}
                                             onChange={handleChange('password_confirmation')}
                                             required
@@ -140,12 +137,11 @@ export default function RegisterOwnerPage() {
                                 </div>
                             </div>
 
-                            {/* Owner Information */}
-                            <div className="space-y-4 pt-4 border-t">
-                                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">
+                            <div className="space-y-4 border-t pt-4">
+                                <h3 className="text-sm font-medium uppercase tracking-wide text-slate-500">
                                     Owner Information
                                 </h3>
-                                
+
                                 <div className="space-y-1">
                                     <Label htmlFor="full_name">Full Name</Label>
                                     <Input
@@ -190,7 +186,7 @@ export default function RegisterOwnerPage() {
 
                             <p className="text-center text-sm text-slate-500">
                                 Already have an account?{' '}
-                                <Link to="/login" className="text-blue-600 hover:underline font-medium">
+                                <Link to="/login" className="font-medium text-blue-600 hover:underline">
                                     Sign in
                                 </Link>
                             </p>

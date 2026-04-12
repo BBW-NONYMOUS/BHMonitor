@@ -46,7 +46,7 @@ export default function Sidebar({ open, onClose }) {
             {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} />}
 
             <aside className={cn(
-                'fixed top-0 left-0 z-40 h-full w-64 bg-slate-900 text-slate-100 flex flex-col transition-transform duration-300',
+                'fixed top-0 left-0 z-40 flex h-full w-[85vw] max-w-64 flex-col bg-slate-900 text-slate-100 transition-transform duration-300',
                 open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             )}>
                 {/* Header */}

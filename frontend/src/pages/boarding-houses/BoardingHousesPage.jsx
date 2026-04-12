@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Search, Eye, Pencil, Trash2, BedDouble, MapPin } from 'lucide-react';
-import { MiniMap } from '@/components/ui/mini-map';
 
 export default function BoardingHousesPage() {
     const [houses, setHouses] = useState([]);
@@ -31,7 +30,9 @@ export default function BoardingHousesPage() {
         }
     };
 
-    useEffect(() => { fetchHouses(); }, [search, status, page]);
+    useEffect(() => {
+        fetchHouses();
+    }, [search, status, page]);
 
     const handleDelete = async (id, name) => {
         try {
@@ -45,35 +46,46 @@ export default function BoardingHousesPage() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Boarding Houses</h1>
-                    <p className="text-slate-500 text-sm">Manage boarding house listings and rooms.</p>
+                    <p className="text-sm text-slate-500">Manage boarding house listings and rooms.</p>
                 </div>
-                <div className="flex gap-2">
-                    <Link to="/boarding-houses/map">
-                        <Button variant="outline"><MapPin className="h-4 w-4 mr-2" />Map</Button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <Link to="/boarding-houses/map" className="w-full sm:w-auto">
+                        <Button variant="outline" className="w-full sm:w-auto"><MapPin className="mr-2 h-4 w-4" />Map</Button>
                     </Link>
-                    <Link to="/boarding-houses/create">
-                        <Button><Plus className="h-4 w-4 mr-2" />Add Boarding House</Button>
+                    <Link to="/boarding-houses/create" className="w-full sm:w-auto">
+                        <Button className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" />Add Boarding House</Button>
                     </Link>
                 </div>
             </div>
 
             <Card>
                 <CardHeader className="pb-3">
-                    <div className="flex gap-3">
-                        <div className="relative flex-1 max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <div className="flex flex-col gap-3 md:flex-row">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <Input
                                 placeholder="Search by name or address..."
                                 className="pl-9"
                                 value={search}
-                                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    setPage(1);
+                                }}
                             />
                         </div>
-                        <Select value={status} onValueChange={v => { setStatus(v === 'all' ? '' : v); setPage(1); }}>
-                            <SelectTrigger className="w-36"><SelectValue placeholder="All Status" /></SelectTrigger>
+                        <Select
+                            value={status}
+                            onValueChange={(v) => {
+                                setStatus(v === 'all' ? '' : v);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-full md:w-36">
+                                <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
@@ -85,14 +97,13 @@ export default function BoardingHousesPage() {
                 <CardContent className="p-0">
                     {loading ? (
                         <div className="flex justify-center py-12">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+                            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600" />
                         </div>
                     ) : (
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[160px]">Location</TableHead>
-                                    <TableHead>Name</TableHead>
+                                    <TableHead className="w-[220px]">Boarding House</TableHead>
                                     <TableHead>Address</TableHead>
                                     <TableHead>Owner</TableHead>
                                     <TableHead>Status</TableHead>
@@ -102,9 +113,9 @@ export default function BoardingHousesPage() {
                             <TableBody>
                                 {houses.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-10 text-slate-400">No boarding houses found.</TableCell>
+                                        <TableCell colSpan={5} className="py-10 text-center text-slate-400">No boarding houses found.</TableCell>
                                     </TableRow>
-                                ) : houses.map(bh => (
+                                ) : houses.map((bh) => (
                                     <TableRow key={bh.id}>
                                         <TableCell>
                                             <div className="flex flex-col">
@@ -114,12 +125,12 @@ export default function BoardingHousesPage() {
                                                 </span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-500 max-w-xs truncate">{bh.address}</TableCell>
-                                        <TableCell className="text-sm">{bh.owner?.full_name || '—'}</TableCell>
+                                        <TableCell className="max-w-xs truncate text-sm text-slate-500">{bh.address}</TableCell>
+                                        <TableCell className="text-sm">{bh.owner?.full_name || '-'}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-col gap-1">
                                                 <Badge variant={bh.status === 'active' ? 'success' : 'secondary'}>
-                                                    {bh.status === 'active' ? '● Active' : '○ Inactive'}
+                                                    {bh.status === 'active' ? 'Active' : 'Inactive'}
                                                 </Badge>
                                                 {bh.status === 'active' ? (
                                                     <span className="text-xs text-green-600">Visible to public</span>
@@ -141,7 +152,7 @@ export default function BoardingHousesPage() {
                                                 </Link>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
-                                                        <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                                        <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700">
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </AlertDialogTrigger>
@@ -167,13 +178,13 @@ export default function BoardingHousesPage() {
                     )}
 
                     {meta.last_page > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                        <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-sm text-slate-500">
-                                Page {meta.current_page} of {meta.last_page} · {meta.total} total
+                                Page {meta.current_page} of {meta.last_page} - {meta.total} total
                             </p>
                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
-                                <Button variant="outline" size="sm" disabled={page >= meta.last_page} onClick={() => setPage(p => p + 1)}>Next</Button>
+                                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
+                                <Button variant="outline" size="sm" disabled={page >= meta.last_page} onClick={() => setPage((p) => p + 1)}>Next</Button>
                             </div>
                         </div>
                     )}
