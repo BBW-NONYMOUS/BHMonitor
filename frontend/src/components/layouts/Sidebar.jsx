@@ -1,36 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { cn } from '@/lib/utils';
+import api from '@/services/api';
 import {
     LayoutDashboard, Users, Building2, Map, UserCog,
-    FileText, LogOut, X, Home, Search, MessageSquare
+    FileText, LogOut, X, Home, Search, BookOpen, GraduationCap,
+    ShieldCheck, Database
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'owner'] },
-    { to: '/students', label: 'Students', icon: Users, roles: ['admin', 'owner'] },
-    { to: '/boarding-houses', label: 'Boarding Houses', icon: Building2, roles: ['admin', 'owner'] },
-    { to: '/boarding-houses/map', label: 'Map View', icon: Map, roles: ['admin', 'owner'] },
-    { to: '/inquiries', label: 'Inquiries', icon: MessageSquare, roles: ['admin', 'owner'], showBadge: true },
-    { to: '/owners', label: 'Owners', icon: UserCog, roles: ['admin'] },
+    // Admin / Owner
+    { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard, roles: ['admin', 'owner'] },
+    { to: '/students',          label: 'Students',        icon: Users,           roles: ['admin', 'owner'] },
+    { to: '/boarding-houses',   label: 'Boarding Houses', icon: Building2,       roles: ['admin', 'owner'] },
+    { to: '/boarding-houses/map', label: 'Map View',      icon: Map,             roles: ['admin', 'owner'] },
+    { to: '/reservations',      label: 'Reservations',    icon: BookOpen,        roles: ['admin', 'owner'], showBadge: true },
+    { to: '/owners',            label: 'Owners',          icon: UserCog,         roles: ['admin'] },
+    { to: '/accounts',          label: 'Accounts',        icon: ShieldCheck,     roles: ['admin'], showAccountBadge: true },
     {
         label: 'Reports', icon: FileText, roles: ['admin', 'owner'],
         children: [
-            { to: '/reports/students', label: 'Students' },
+            { to: '/reports/students',       label: 'Students' },
             { to: '/reports/boarding-houses', label: 'Boarding Houses' },
-            { to: '/reports/occupancy', label: 'Occupancy' },
-            { to: '/reports/geo', label: 'Geo Report' },
+            { to: '/reports/occupancy',       label: 'Occupancy' },
+            { to: '/reports/geo',             label: 'Geo Report' },
         ]
     },
+    { to: '/backup', label: 'Backup & Restore', icon: Database, roles: ['admin'] },
+    // Student
+    { to: '/student-dashboard', label: 'My Dashboard', icon: GraduationCap, roles: ['student'] },
+    { to: '/student-documents', label: 'My Documents',  icon: FileText,      roles: ['student'] },
 ];
 
 export default function Sidebar({ open, onClose }) {
     const { user, logout } = useAuth();
     const { unreadCount } = useNotifications();
     const navigate = useNavigate();
+    const [pendingAccounts, setPendingAccounts] = useState(0);
+
+    // Poll pending account count for admin
+    useEffect(() => {
+        if (user?.role !== 'admin') return;
+        const fetchCount = () => {
+            api.get('/accounts/pending-count')
+               .then(r => setPendingAccounts(r.data.pending_accounts || 0))
+               .catch(() => {});
+        };
+        fetchCount();
+        const interval = setInterval(fetchCount, 60000);
+        return () => clearInterval(interval);
+    }, [user?.role]);
 
     const handleLogout = async () => {
         await logout();
@@ -42,8 +64,10 @@ export default function Sidebar({ open, onClose }) {
 
     return (
         <>
-            {/* Overlay */}
-            {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} />}
+            {/* Mobile overlay */}
+            {open && (
+                <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onClose} />
+            )}
 
             <aside className={cn(
                 'fixed top-0 left-0 z-40 flex h-full w-[85vw] max-w-64 flex-col bg-slate-900 text-slate-100 transition-transform duration-300',
@@ -113,6 +137,11 @@ export default function Sidebar({ open, onClose }) {
                                         {unreadCount > 9 ? '9+' : unreadCount}
                                     </span>
                                 )}
+                                {item.showAccountBadge && pendingAccounts > 0 && (
+                                    <span className="ml-auto bg-amber-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full">
+                                        {pendingAccounts > 9 ? '9+' : pendingAccounts}
+                                    </span>
+                                )}
                             </NavLink>
                         );
                     })}
@@ -132,9 +161,17 @@ export default function Sidebar({ open, onClose }) {
                 {/* User */}
                 <div className="border-t border-slate-700 p-4">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                            {user?.name?.charAt(0).toUpperCase()}
-                        </div>
+                        {user?.profile_photo_url ? (
+                            <img
+                                src={user.profile_photo_url}
+                                alt={user.name}
+                                className="h-8 w-8 rounded-full object-cover ring-2 ring-blue-500"
+                            />
+                        ) : (
+                            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                                {user?.name?.charAt(0).toUpperCase()}
+                            </div>
+                        )}
                         <div className="min-w-0">
                             <p className="text-sm font-medium text-white truncate">{user?.name}</p>
                             <p className="text-xs text-slate-400 capitalize">{user?.role}</p>

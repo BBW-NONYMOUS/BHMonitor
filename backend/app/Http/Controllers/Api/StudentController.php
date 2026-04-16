@@ -7,19 +7,20 @@ use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
 use App\Models\Student;
 use App\Models\StudentBoardingHistory;
+use App\Models\StudentInquiry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class StudentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $query = Student::with('boardingHouse.owner');
+        $user  = $request->user();
+        $query = Student::with(['boardingHouse.owner', 'room:id,room_name']);
 
         if ($user->isOwner()) {
-            $ownerId = $user->owner?->id;
-            $bhIds = BoardingHouse::where('owner_id', $ownerId)->pluck('id');
+            $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
             $query->whereIn('boarding_house_id', $bhIds);
         }
 
@@ -30,40 +31,36 @@ class StudentController extends Controller
                   ->orWhere('last_name', 'like', "%{$search}%");
             });
         }
-        if ($course = $request->get('course')) {
-            $query->where('course', $course);
-        }
-        if ($year = $request->get('year_level')) {
-            $query->where('year_level', $year);
-        }
+        if ($course = $request->get('course')) $query->where('course', $course);
+        if ($year   = $request->get('year_level')) $query->where('year_level', $year);
 
-        $students = $query->orderByDesc('created_at')->paginate(15);
-
-        return response()->json($students);
+        return response()->json($query->orderByDesc('created_at')->paginate(15));
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'student_no'      => 'required|string|unique:students',
-            'first_name'      => 'required|string',
-            'last_name'       => 'required|string',
-            'gender'          => 'nullable|in:Male,Female',
-            'course'          => 'nullable|string',
-            'year_level'      => 'nullable|string',
-            'contact_number'  => 'nullable|string|max:20',
-            'parent_name'     => 'nullable|string',
-            'parent_contact'  => 'nullable|string|max:20',
+            'student_no'        => 'required|string|unique:students',
+            'first_name'        => 'required|string|max:255',
+            'last_name'         => 'required|string|max:255',
+            'gender'            => 'nullable|in:Male,Female',
+            'course'            => 'nullable|string|max:255',
+            'year_level'        => 'nullable|string|max:50',
+            'contact_number'    => 'nullable|string|max:20',
+            'address'           => 'nullable|string|max:500',
+            'parent_name'       => 'nullable|string|max:255',
+            'parent_contact'    => 'nullable|string|max:20',
             'boarding_house_id' => 'nullable|exists:boarding_houses,id',
+            'room_id'           => 'nullable|exists:rooms,id',
         ]);
 
         if ($request->hasFile('image')) {
+            $request->validate(['image' => 'image|max:5120']);
             $data['image'] = $request->file('image')->store('students', 'public');
         }
 
         $student = Student::create($data);
 
-        // Record initial boarding assignment in history
         if (!empty($data['boarding_house_id'])) {
             StudentBoardingHistory::create([
                 'student_id'        => $student->id,
@@ -78,40 +75,120 @@ class StudentController extends Controller
             'created_at' => now(),
         ]);
 
-        return response()->json($student->load('boardingHouse'), 201);
+        return response()->json($student->load('boardingHouse', 'room'), 201);
+    }
+
+    /**
+     * Direct Add from an approved reservation — no re-entry of data
+     */
+    public function storeFromReservation(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'reservation_id'    => 'required|exists:student_inquiries,id',
+            'boarding_house_id' => 'nullable|exists:boarding_houses,id',
+            'room_id'           => 'nullable|exists:rooms,id',
+        ]);
+
+        $reservation = StudentInquiry::findOrFail($data['reservation_id']);
+
+        if ($reservation->status !== 'approved') {
+            return response()->json(['message' => 'Only approved reservations can be converted to student records.'], 422);
+        }
+
+        if ($reservation->student_id) {
+            return response()->json(['message' => 'This reservation has already been converted to a student record.'], 422);
+        }
+
+        // Check if student_no already exists
+        if (Student::where('student_no', $reservation->student_no)->exists()) {
+            return response()->json(['message' => 'A student with this student number already exists.'], 422);
+        }
+
+        $student = Student::create([
+            'student_no'        => $reservation->student_no,
+            'first_name'        => explode(' ', $reservation->full_name, 2)[0] ?? $reservation->full_name,
+            'last_name'         => explode(' ', $reservation->full_name, 2)[1] ?? '',
+            'gender'            => $reservation->gender,
+            'course'            => $reservation->course,
+            'year_level'        => $reservation->year_level,
+            'contact_number'    => $reservation->contact_number,
+            'boarding_house_id' => $data['boarding_house_id'] ?? $reservation->boarding_house_id,
+            'room_id'           => $data['room_id'] ?? null,
+        ]);
+
+        // Link reservation to student and mark converted
+        $reservation->update(['student_id' => $student->id]);
+
+        if ($student->boarding_house_id) {
+            StudentBoardingHistory::create([
+                'student_id'        => $student->id,
+                'boarding_house_id' => $student->boarding_house_id,
+                'boarded_at'        => now(),
+            ]);
+        }
+
+        ActivityLog::create([
+            'user_id'    => $request->user()->id,
+            'action'     => "Created student {$student->first_name} {$student->last_name} from reservation.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json($student->load('boardingHouse', 'room'), 201);
     }
 
     public function show(Student $student): JsonResponse
     {
-        return response()->json($student->load('boardingHouse.owner', 'boardingHouse.rooms'));
+        return response()->json($student->load('boardingHouse.owner', 'boardingHouse.rooms', 'room'));
     }
 
     public function update(Request $request, Student $student): JsonResponse
     {
-        $data = $request->validate([
-            'student_no'      => "required|string|unique:students,student_no,{$student->id}",
-            'first_name'      => 'required|string',
-            'last_name'       => 'required|string',
-            'gender'          => 'nullable|in:Male,Female',
-            'course'          => 'nullable|string',
-            'year_level'      => 'nullable|string',
-            'contact_number'  => 'nullable|string|max:20',
-            'parent_name'     => 'nullable|string',
-            'parent_contact'  => 'nullable|string|max:20',
-            'boarding_house_id' => 'nullable|exists:boarding_houses,id',
-        ]);
+        $user = $request->user();
+
+        // Students cannot change their own student_no
+        if ($user->isStudent()) {
+            $data = $request->validate([
+                'first_name'     => 'sometimes|string|max:255',
+                'last_name'      => 'sometimes|string|max:255',
+                'gender'         => 'nullable|in:Male,Female',
+                'course'         => 'nullable|string|max:255',
+                'year_level'     => 'nullable|string|max:50',
+                'contact_number' => 'nullable|string|max:20',
+                'address'        => 'nullable|string|max:500',
+                'parent_name'    => 'nullable|string|max:255',
+                'parent_contact' => 'nullable|string|max:20',
+            ]);
+            // Explicitly exclude student_no
+            unset($data['student_no']);
+        } else {
+            $data = $request->validate([
+                'first_name'        => 'required|string|max:255',
+                'last_name'         => 'required|string|max:255',
+                'gender'            => 'nullable|in:Male,Female',
+                'course'            => 'nullable|string|max:255',
+                'year_level'        => 'nullable|string|max:50',
+                'contact_number'    => 'nullable|string|max:20',
+                'address'           => 'nullable|string|max:500',
+                'parent_name'       => 'nullable|string|max:255',
+                'parent_contact'    => 'nullable|string|max:20',
+                'boarding_house_id' => 'nullable|exists:boarding_houses,id',
+                'room_id'           => 'nullable|exists:rooms,id',
+            ]);
+            // Student ID is immutable after creation
+            unset($data['student_no']);
+        }
 
         if ($request->hasFile('image')) {
+            $request->validate(['image' => 'image|max:5120']);
             $data['image'] = $request->file('image')->store('students', 'public');
         }
 
         $oldBhId = $student->boarding_house_id;
-        $newBhId = $data['boarding_house_id'] ?? null;
+        $newBhId = $data['boarding_house_id'] ?? $student->boarding_house_id;
 
         $student->update($data);
 
-        // Track boarding house change in history
-        if ($oldBhId !== $newBhId) {
+        if (isset($data['boarding_house_id']) && $oldBhId !== $newBhId) {
             if ($oldBhId) {
                 StudentBoardingHistory::where('student_id', $student->id)
                     ->whereNull('vacated_at')
@@ -132,7 +209,7 @@ class StudentController extends Controller
             'created_at' => now(),
         ]);
 
-        return response()->json($student->load('boardingHouse'));
+        return response()->json($student->load('boardingHouse', 'room'));
     }
 
     public function destroy(Request $request, Student $student): JsonResponse
@@ -152,11 +229,13 @@ class StudentController extends Controller
     public function assignForm(Student $student): JsonResponse
     {
         $boardingHouses = BoardingHouse::where('status', 'active')
+            ->where('approval_status', 'approved')
+            ->with(['rooms' => fn($q) => $q->withCount('students')])
             ->orderBy('boarding_name')
             ->get(['id', 'boarding_name', 'address', 'available_rooms', 'room_rate']);
 
         return response()->json([
-            'student'        => $student->load('boardingHouse'),
+            'student'         => $student->load('boardingHouse', 'room'),
             'boarding_houses' => $boardingHouses,
         ]);
     }
@@ -171,43 +250,39 @@ class StudentController extends Controller
         $newBhId = $data['boarding_house_id'] ?? null;
         $oldBhId = $student->boarding_house_id;
 
-        // Close the current open history entry if the student is moving out
         if ($oldBhId && $oldBhId !== $newBhId) {
             StudentBoardingHistory::where('student_id', $student->id)
                 ->whereNull('vacated_at')
                 ->update(['vacated_at' => now()]);
         }
 
-        $student->update(['boarding_house_id' => $newBhId]);
+        $student->update(['boarding_house_id' => $newBhId, 'room_id' => null]);
 
-        // Record the new assignment
         if ($newBhId) {
             StudentBoardingHistory::create([
-                'student_id'       => $student->id,
+                'student_id'        => $student->id,
                 'boarding_house_id' => $newBhId,
-                'boarded_at'       => now(),
-                'notes'            => $data['notes'] ?? null,
+                'boarded_at'        => now(),
+                'notes'             => $data['notes'] ?? null,
             ]);
         }
 
         $bh = $newBhId ? BoardingHouse::find($newBhId) : null;
         ActivityLog::create([
-            'user_id' => $request->user()->id,
-            'action'  => $newBhId
+            'user_id'    => $request->user()->id,
+            'action'     => $newBhId
                 ? "Assigned student {$student->first_name} {$student->last_name} to {$bh->boarding_name}."
                 : "Unassigned student {$student->first_name} {$student->last_name} from boarding house.",
             'created_at' => now(),
         ]);
 
-        return response()->json($student->load('boardingHouse'));
+        return response()->json($student->load('boardingHouse', 'room'));
     }
 
     public function boardingHistory(Student $student): JsonResponse
     {
-        $history = $student->boardingHistories()
-            ->with('boardingHouse:id,boarding_name,address')
-            ->get();
-
-        return response()->json($history);
+        return response()->json(
+            $student->boardingHistories()->with('boardingHouse:id,boarding_name,address')->get()
+        );
     }
 }

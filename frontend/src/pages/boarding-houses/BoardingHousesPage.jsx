@@ -9,20 +9,24 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Search, Eye, Pencil, Trash2, BedDouble, MapPin } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, BedDouble, MapPin, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function BoardingHousesPage() {
+    const { isAdmin } = useAuth();
     const [houses, setHouses] = useState([]);
     const [meta, setMeta] = useState({});
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
+    const [approval, setApproval] = useState('');
+    const [availability, setAvailability] = useState('');
     const [page, setPage] = useState(1);
 
     const fetchHouses = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/boarding-houses', { params: { search, status, page } });
+            const { data } = await api.get('/boarding-houses', { params: { search, status, approval_status: approval, availability, page } });
             setHouses(data.data);
             setMeta({ current_page: data.current_page, last_page: data.last_page, total: data.total });
         } finally {
@@ -32,7 +36,27 @@ export default function BoardingHousesPage() {
 
     useEffect(() => {
         fetchHouses();
-    }, [search, status, page]);
+    }, [search, status, approval, availability, page]);
+
+    const handleApprove = async (id, name) => {
+        try {
+            await api.put(`/boarding-houses/${id}/approve`);
+            toast.success(`${name} approved.`);
+            fetchHouses();
+        } catch {
+            toast.error('Failed to approve boarding house.');
+        }
+    };
+
+    const handleReject = async (id, name) => {
+        try {
+            await api.put(`/boarding-houses/${id}/reject`);
+            toast.success(`${name} rejected.`);
+            fetchHouses();
+        } catch {
+            toast.error('Failed to reject boarding house.');
+        }
+    };
 
     const handleDelete = async (id, name) => {
         try {
@@ -78,10 +102,7 @@ export default function BoardingHousesPage() {
                         </div>
                         <Select
                             value={status}
-                            onValueChange={(v) => {
-                                setStatus(v === 'all' ? '' : v);
-                                setPage(1);
-                            }}
+                            onValueChange={(v) => { setStatus(v === 'all' ? '' : v); setPage(1); }}
                         >
                             <SelectTrigger className="w-full md:w-36">
                                 <SelectValue placeholder="All Status" />
@@ -90,6 +111,35 @@ export default function BoardingHousesPage() {
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {isAdmin() && (
+                            <Select
+                                value={approval}
+                                onValueChange={(v) => { setApproval(v === 'all' ? '' : v); setPage(1); }}
+                            >
+                                <SelectTrigger className="w-full md:w-40">
+                                    <SelectValue placeholder="All Approvals" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Approvals</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="approved">Approved</SelectItem>
+                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <Select
+                            value={availability}
+                            onValueChange={(v) => { setAvailability(v === 'all' ? '' : v); setPage(1); }}
+                        >
+                            <SelectTrigger className="w-full md:w-40">
+                                <SelectValue placeholder="Availability" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Availability</SelectItem>
+                                <SelectItem value="available">Has Rooms</SelectItem>
+                                <SelectItem value="full">Fully Occupied</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -103,17 +153,18 @@ export default function BoardingHousesPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[220px]">Boarding House</TableHead>
+                                    <TableHead className="w-[200px]">Boarding House</TableHead>
                                     <TableHead>Address</TableHead>
                                     <TableHead>Owner</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Approval</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {houses.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="py-10 text-center text-slate-400">No boarding houses found.</TableCell>
+                                        <TableCell colSpan={6} className="py-10 text-center text-slate-400">No boarding houses found.</TableCell>
                                     </TableRow>
                                 ) : houses.map((bh) => (
                                     <TableRow key={bh.id}>
@@ -128,14 +179,26 @@ export default function BoardingHousesPage() {
                                         <TableCell className="max-w-xs truncate text-sm text-slate-500">{bh.address}</TableCell>
                                         <TableCell className="text-sm">{bh.owner?.full_name || '-'}</TableCell>
                                         <TableCell>
+                                            <Badge variant={bh.status === 'active' ? 'success' : 'secondary'}>
+                                                {bh.status === 'active' ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex flex-col gap-1">
-                                                <Badge variant={bh.status === 'active' ? 'success' : 'secondary'}>
-                                                    {bh.status === 'active' ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                                {bh.status === 'active' ? (
-                                                    <span className="text-xs text-green-600">Visible to public</span>
-                                                ) : (
-                                                    <span className="text-xs text-slate-400">Hidden from public</span>
+                                                {bh.approval_status === 'approved' && (
+                                                    <Badge variant="success" className="gap-1 w-fit">
+                                                        <CheckCircle className="h-3 w-3" /> Approved
+                                                    </Badge>
+                                                )}
+                                                {bh.approval_status === 'pending' && (
+                                                    <Badge variant="secondary" className="gap-1 w-fit text-amber-700 bg-amber-50 border-amber-200">
+                                                        <Clock className="h-3 w-3" /> Pending
+                                                    </Badge>
+                                                )}
+                                                {bh.approval_status === 'rejected' && (
+                                                    <Badge variant="destructive" className="gap-1 w-fit">
+                                                        <XCircle className="h-3 w-3" /> Rejected
+                                                    </Badge>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -150,6 +213,26 @@ export default function BoardingHousesPage() {
                                                 <Link to={`/boarding-houses/${bh.id}/edit`}>
                                                     <Button size="icon" variant="ghost" title="Edit"><Pencil className="h-4 w-4" /></Button>
                                                 </Link>
+                                                {isAdmin() && bh.approval_status === 'pending' && (
+                                                    <>
+                                                        <Button
+                                                            size="icon" variant="ghost"
+                                                            className="text-green-600 hover:bg-green-50"
+                                                            title="Approve"
+                                                            onClick={() => handleApprove(bh.id, bh.boarding_name)}
+                                                        >
+                                                            <CheckCircle className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="icon" variant="ghost"
+                                                            className="text-red-500 hover:bg-red-50"
+                                                            title="Reject"
+                                                            onClick={() => handleReject(bh.id, bh.boarding_name)}
+                                                        >
+                                                            <XCircle className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
                                                         <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700">

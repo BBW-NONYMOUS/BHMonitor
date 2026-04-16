@@ -14,7 +14,10 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = [
+        'name', 'email', 'password', 'role',
+        'account_status', 'profile_photo', 'rejection_reason', 'google_id',
+    ];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -22,13 +25,18 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
         ];
     }
 
     public function owner()
     {
         return $this->hasOne(Owner::class);
+    }
+
+    public function student()
+    {
+        return $this->hasOne(\App\Models\Student::class);
     }
 
     public function activityLogs()
@@ -44,5 +52,30 @@ class User extends Authenticatable
     public function isOwner(): bool
     {
         return $this->role === 'owner';
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->role === 'student';
+    }
+
+    public function isPending(): bool
+    {
+        return $this->account_status === 'pending';
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->account_status === 'approved';
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->account_status === 'rejected';
+    }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo ? '/storage/' . $this->profile_photo : null;
     }
 }

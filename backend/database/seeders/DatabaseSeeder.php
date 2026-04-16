@@ -57,6 +57,7 @@ class DatabaseSeeder extends Seeder
                 'latitude'        => 6.62950000,
                 'longitude'       => 124.60620000,
                 'status'          => 'active',
+                'approval_status' => 'approved',
             ]
         );
 

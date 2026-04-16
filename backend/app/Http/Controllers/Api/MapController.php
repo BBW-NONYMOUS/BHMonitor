@@ -42,6 +42,7 @@ class MapController extends Controller
         $markers = BoardingHouse::whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->where('status', 'active')
+            ->where('approval_status', 'approved')
             ->get()
             ->map(fn ($bh) => [
                 'id'        => $bh->id,

@@ -10,6 +10,10 @@ import AppLayout from '@/components/layouts/AppLayout';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterOwnerPage from '@/pages/auth/RegisterOwnerPage';
+import RegisterStudentPage from '@/pages/auth/RegisterStudentPage';
+import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage';
+import StudentDashboardPage from '@/pages/students/StudentDashboardPage';
+import StudentDocumentsPage from '@/pages/students/StudentDocumentsPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import StudentsPage from '@/pages/students/StudentsPage';
 import StudentFormPage from '@/pages/students/StudentFormPage';
@@ -26,6 +30,8 @@ import RoomsPage from '@/pages/boarding-houses/RoomsPage';
 import MapPage from '@/pages/boarding-houses/MapPage';
 import OwnersPage from '@/pages/owners/OwnersPage';
 import OwnerFormPage from '@/pages/owners/OwnerFormPage';
+import AccountApprovalsPage from '@/pages/admin/AccountApprovalsPage';
+import BackupRestorePage from '@/pages/admin/BackupRestorePage';
 import StudentsReportPage from '@/pages/reports/StudentsReportPage';
 import BoardingReportPage from '@/pages/reports/BoardingReportPage';
 import OccupancyReportPage from '@/pages/reports/OccupancyReportPage';
@@ -48,8 +54,21 @@ function AdminRoute({ children }) {
 
 function GuestRoute({ children }) {
     const { user } = useAuth();
-    if (user) return <Navigate to="/dashboard" replace />;
+    if (user) return <Navigate to={user.role === 'student' ? '/student-dashboard' : '/dashboard'} replace />;
     return children;
+}
+
+function StudentRoute({ children }) {
+    const { user } = useAuth();
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== 'student') return <Navigate to="/dashboard" replace />;
+    return children;
+}
+
+function SmartRedirect() {
+    const { user } = useAuth();
+    if (user?.role === 'student') return <Navigate to="/student-dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
 }
 
 function App() {
@@ -62,9 +81,13 @@ function App() {
                 <Route path="/find-boarding" element={<FindBoardingPage />} />
                 <Route path="/find-boarding/:id" element={<StudentBoardingDetailPage />} />
 
+                {/* Google OAuth callback — must be public, never redirected */}
+                <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+
                 {/* Guest (redirect to dashboard if logged in) */}
                 <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
                 <Route path="/register-owner" element={<GuestRoute><RegisterOwnerPage /></GuestRoute>} />
+                <Route path="/register-student" element={<GuestRoute><RegisterStudentPage /></GuestRoute>} />
 
                 {/* Protected */}
                 <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -86,13 +109,19 @@ function App() {
                     <Route path="boarding-houses/:id/inquiries" element={<InquiriesPage />} />
                     <Route path="boarding-houses/map" element={<MapPage />} />
 
-                    {/* Inquiries (all) */}
+                    {/* Reservations (all) — legacy alias kept */}
                     <Route path="inquiries" element={<AllInquiriesPage />} />
+                    <Route path="reservations" element={<AllInquiriesPage />} />
+                    <Route path="boarding-houses/:id/reservations" element={<InquiriesPage />} />
 
                     {/* Owners — admin only */}
                     <Route path="owners" element={<AdminRoute><OwnersPage /></AdminRoute>} />
                     <Route path="owners/create" element={<AdminRoute><OwnerFormPage /></AdminRoute>} />
                     <Route path="owners/:id/edit" element={<AdminRoute><OwnerFormPage /></AdminRoute>} />
+
+                    {/* Admin-only tools */}
+                    <Route path="accounts" element={<AdminRoute><AccountApprovalsPage /></AdminRoute>} />
+                    <Route path="backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
 
                     {/* Reports */}
                     <Route path="reports/students" element={<StudentsReportPage />} />
@@ -101,8 +130,14 @@ function App() {
                     <Route path="reports/geo" element={<GeoReportPage />} />
                 </Route>
 
+                {/* Student Routes */}
+                <Route element={<StudentRoute><AppLayout /></StudentRoute>}>
+                    <Route path="student-dashboard" element={<StudentDashboardPage />} />
+                    <Route path="student-documents" element={<StudentDocumentsPage />} />
+                </Route>
+
                 {/* Fallback */}
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<SmartRedirect />} />
             </Routes>
         </BrowserRouter>
     );

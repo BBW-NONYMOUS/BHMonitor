@@ -37,7 +37,7 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-    const { isOwner, isNewOwner } = useAuth();
+    const { isOwner, isAdmin, isNewOwner } = useAuth();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [boardingHouses, setBoardingHouses] = useState([]);
@@ -95,34 +95,60 @@ export default function DashboardPage() {
                     <p className="text-slate-500 text-sm mt-1">Overview of the boarding monitoring system.</p>
                 </div>
 
-                {/* Stats with animated counters */}
+                {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <StatCard 
-                        title="Total Students" 
-                        value={stats?.total_students || 0} 
-                        icon={Users} 
+                    <StatCard
+                        title="Total Students"
+                        value={stats?.total_students || 0}
+                        icon={Users}
                         iconClassName="bg-blue-100 text-blue-600"
                     />
-                    <StatCard 
-                        title="Boarding Houses" 
-                        value={stats?.total_boarding_houses || 0} 
-                        icon={Building2} 
+                    <StatCard
+                        title="Boarding Houses"
+                        value={stats?.total_boarding_houses || 0}
+                        icon={Building2}
                         iconClassName="bg-emerald-100 text-emerald-600"
                     />
-                    <StatCard 
-                        title="Total Rooms" 
-                        value={stats?.total_rooms || 0} 
-                        icon={BedDouble} 
+                    <StatCard
+                        title="Total Rooms"
+                        value={stats?.total_rooms || 0}
+                        icon={BedDouble}
                         iconClassName="bg-violet-100 text-violet-600"
                     />
-                    <StatCard 
-                        title="Occupied Rooms" 
-                        value={stats?.occupied_rooms || 0} 
-                        icon={CheckSquare} 
+                    <StatCard
+                        title="Occupied Rooms"
+                        value={stats?.occupied_rooms || 0}
+                        icon={CheckSquare}
                         iconClassName="bg-orange-100 text-orange-600"
                         description={`${occupancyPercent}% occupancy`}
                     />
                 </div>
+
+                {/* Pending Account Approvals banner — admin only */}
+                {isAdmin() && (stats?.pending_accounts || 0) > 0 && (
+                    <Link to="/accounts">
+                        <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 hover:bg-blue-100 transition-colors cursor-pointer">
+                            <Clock className="h-4 w-4 shrink-0 text-blue-500" />
+                            <span>
+                                <strong>{stats.pending_accounts}</strong> user {stats.pending_accounts === 1 ? 'account' : 'accounts'} pending your approval.
+                            </span>
+                            <span className="ml-auto font-medium underline">Review accounts →</span>
+                        </div>
+                    </Link>
+                )}
+
+                {/* Pending BH Approvals banner — admin only */}
+                {isAdmin() && (stats?.pending_approvals || 0) > 0 && (
+                    <Link to="/boarding-houses?approval=pending">
+                        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer">
+                            <Clock className="h-4 w-4 shrink-0 text-amber-500" />
+                            <span>
+                                <strong>{stats.pending_approvals}</strong> boarding {stats.pending_approvals === 1 ? 'house' : 'houses'} pending your approval.
+                            </span>
+                            <span className="ml-auto font-medium underline">Review now →</span>
+                        </div>
+                    </Link>
+                )}
 
                 {/* Charts & Quick Actions */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

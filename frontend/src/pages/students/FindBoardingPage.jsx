@@ -91,6 +91,13 @@ const getMarkerIcon = (available) => {
     return createCustomIcon('#ef4444', available);
 };
 
+// Compute availability status based on room availability count
+const computeAvailabilityStatus = (available) => {
+    if (available === null || available === undefined || available === 0) return 'full';
+    if (available >= 5) return 'available';
+    return 'limited';
+};
+
 // Calculate distance between two coordinates in km
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -109,6 +116,7 @@ export default function FindBoardingPage() {
     const [loading, setLoading] = useState(false);
     const [coords, setCoords] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+    const [availabilityFilter, setAvailabilityFilter] = useState([]); // ['available', 'limited', 'full']
     const [filters, setFilters] = useState({
         search: '', max_price: '', gender_type: '', sort: 'latest',
     });
@@ -136,13 +144,21 @@ export default function FindBoardingPage() {
     useEffect(() => { fetchResults(); }, [filters]);
     useEffect(() => { fetchMapMarkers(); }, []);
 
-    // Add distance to markers
+    // Add distance to markers and apply availability filter
     const markersWithDistance = useMemo(() => {
-        return mapMarkers.map(m => ({
+        let markers = mapMarkers.map(m => ({
             ...m,
-            distance: calculateDistance(SKSU_KALAMANSIG[0], SKSU_KALAMANSIG[1], m.latitude, m.longitude)
+            distance: calculateDistance(SKSU_KALAMANSIG[0], SKSU_KALAMANSIG[1], m.latitude, m.longitude),
+            availability_status: computeAvailabilityStatus(m.available)
         })).sort((a, b) => a.distance - b.distance);
-    }, [mapMarkers]);
+
+        // Apply availability filter if any filters are selected
+        if (availabilityFilter.length > 0) {
+            markers = markers.filter(m => availabilityFilter.includes(m.availability_status));
+        }
+
+        return markers;
+    }, [mapMarkers, availabilityFilter]);
 
     const getLocation = () => {
         navigator.geolocation?.getCurrentPosition(pos => {
@@ -171,16 +187,16 @@ export default function FindBoardingPage() {
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <Button 
-                                    variant={viewMode === 'list' ? 'default' : 'outline'} 
+                                <Button
+                                    variant={viewMode === 'list' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setViewMode('list')}
                                 >
                                     <List className="h-4 w-4 mr-1" />
                                     List
                                 </Button>
-                                <Button 
-                                    variant={viewMode === 'map' ? 'default' : 'outline'} 
+                                <Button
+                                    variant={viewMode === 'map' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => setViewMode('map')}
                                 >
@@ -203,6 +219,66 @@ export default function FindBoardingPage() {
                                     Full
                                 </span>
                             </div>
+                        </div>
+
+                        {/* Availability Filter Buttons - REQ-014 */}
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                            <span className="text-sm text-slate-500 mr-1">Filter by status:</span>
+                            <Button
+                                variant={availabilityFilter.includes('available') ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => {
+                                    setAvailabilityFilter(prev =>
+                                        prev.includes('available')
+                                            ? prev.filter(s => s !== 'available')
+                                            : [...prev, 'available']
+                                    );
+                                }}
+                                className={availabilityFilter.includes('available') ? 'bg-green-600 hover:bg-green-700' : 'border-green-300 text-green-700 hover:bg-green-50'}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
+                                Available
+                            </Button>
+                            <Button
+                                variant={availabilityFilter.includes('limited') ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => {
+                                    setAvailabilityFilter(prev =>
+                                        prev.includes('limited')
+                                            ? prev.filter(s => s !== 'limited')
+                                            : [...prev, 'limited']
+                                    );
+                                }}
+                                className={availabilityFilter.includes('limited') ? 'bg-amber-500 hover:bg-amber-600' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+                                Limited
+                            </Button>
+                            <Button
+                                variant={availabilityFilter.includes('full') ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => {
+                                    setAvailabilityFilter(prev =>
+                                        prev.includes('full')
+                                            ? prev.filter(s => s !== 'full')
+                                            : [...prev, 'full']
+                                    );
+                                }}
+                                className={availabilityFilter.includes('full') ? 'bg-red-600 hover:bg-red-700' : 'border-red-300 text-red-700 hover:bg-red-50'}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-red-500 mr-1.5"></span>
+                                Full
+                            </Button>
+                            {availabilityFilter.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setAvailabilityFilter([])}
+                                    className="text-slate-500"
+                                >
+                                    Clear filters
+                                </Button>
+                            )}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div className="relative lg:col-span-1">
@@ -252,10 +328,17 @@ export default function FindBoardingPage() {
                 {viewMode === 'map' && (
                     <div className="mb-6">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm" style={{ height: '500px' }}>
-                            <MapContainer center={SKSU_KALAMANSIG} zoom={14} style={{ height: '100%', width: '100%' }}>
+                            <MapContainer center={SKSU_KALAMANSIG} zoom={15} style={{ height: '100%', width: '100%' }}>
+                                {/* Satellite view by default - ESRI World Imagery - REQ-015 */}
                                 <TileLayer
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                />
+                                {/* Labels overlay for better readability */}
+                                <TileLayer
+                                    attribution='&copy; Esri'
+                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                                    opacity={0.7}
                                 />
                                 
                                 {/* SKSU Campus Marker */}

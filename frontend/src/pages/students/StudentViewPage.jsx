@@ -76,7 +76,6 @@ export default function StudentViewPage() {
                                 </div>
                                 <Field label="Boarding House" value={bh.boarding_name} />
                                 <Field label="Address" value={bh.address} />
-                                <Field label="Owner" value={bh.owner?.full_name} />
                                 <Field label="Room Rate" value={bh.room_rate ? `P${Number(bh.room_rate).toLocaleString()}/mo` : null} />
                                 <Link to={`/boarding-houses/${bh.id}`} className="inline-flex w-full sm:w-auto">
                                     <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto">View Boarding House</Button>

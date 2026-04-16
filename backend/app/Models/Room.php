@@ -14,6 +14,8 @@ class Room extends Model
         'available_slots', 'price', 'status', 'gender_type', 'amenities',
     ];
 
+    protected $appends = ['computed_status'];
+
     protected function casts(): array
     {
         return [
@@ -27,6 +29,28 @@ class Room extends Model
     public function boardingHouse()
     {
         return $this->belongsTo(BoardingHouse::class);
+    }
+
+    public function students()
+    {
+        return $this->hasMany(Student::class);
+    }
+
+    public function photos()
+    {
+        return $this->hasMany(RoomPhoto::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Auto-computed availability status based on student count vs. capacity.
+     * available = 0 students, limited = 1 to capacity-1, full = at capacity
+     */
+    public function getComputedStatusAttribute(): string
+    {
+        $count = $this->students()->count();
+        if ($count === 0) return 'available';
+        if ($count >= $this->capacity) return 'full';
+        return 'limited';
     }
 
     protected static function booted(): void

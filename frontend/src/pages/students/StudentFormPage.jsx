@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import api from '@/services/api';
 import { toast } from 'sonner';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'];
@@ -81,8 +81,15 @@ export default function StudentFormPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <Label>Student No. *</Label>
-                                <Input value={form.student_no} onChange={set('student_no')} required />
+                                <Label>Student ID *</Label>
+                                <Input
+                                    value={form.student_no}
+                                    onChange={set('student_no')}
+                                    required
+                                    disabled={isEdit}
+                                    className={isEdit ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
+                                />
+                                {isEdit && <p className="text-xs text-slate-400">Student ID cannot be changed after creation.</p>}
                                 {errors.student_no && <p className="text-xs text-red-500">{errors.student_no[0]}</p>}
                             </div>
                             <div className="space-y-1">

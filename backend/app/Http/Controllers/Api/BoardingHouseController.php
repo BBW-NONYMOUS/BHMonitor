@@ -29,6 +29,16 @@ class BoardingHouseController extends Controller
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
+        if ($approvalStatus = $request->input('approval_status')) {
+            $query->where('approval_status', $approvalStatus);
+        }
+        if ($availability = $request->input('availability')) {
+            if ($availability === 'available') {
+                $query->whereRaw('available_rooms > 0');
+            } elseif ($availability === 'full') {
+                $query->whereRaw('available_rooms <= 0')->where('total_rooms', '>', 0);
+            }
+        }
 
         $boardingHouses = $query->orderByDesc('created_at')->paginate(15);
         return response()->json($boardingHouses);
@@ -50,7 +60,10 @@ class BoardingHouseController extends Controller
         ]);
 
         if ($user->isOwner()) {
-            $data['owner_id'] = $user->owner->id;
+            $data['owner_id']        = $user->owner->id;
+            $data['approval_status'] = 'pending'; // owners need admin approval
+        } else {
+            $data['approval_status'] = 'approved'; // admin-created go live immediately
         }
 
         if ($request->hasFile('image')) {
@@ -126,5 +139,52 @@ class BoardingHouseController extends Controller
         ]);
 
         return response()->json(['message' => 'Boarding house deleted.']);
+    }
+
+    public function approve(Request $request, BoardingHouse $boardingHouse): JsonResponse
+    {
+        $data = $request->validate(['admin_notes' => 'nullable|string']);
+
+        $boardingHouse->update([
+            'approval_status' => 'approved',
+            'status'          => 'active',
+            'admin_notes'     => $data['admin_notes'] ?? $boardingHouse->admin_notes,
+        ]);
+
+        ActivityLog::create([
+            'user_id'    => $request->user()->id,
+            'action'     => "Approved boarding house: {$boardingHouse->boarding_name}.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json($boardingHouse->load('owner'));
+    }
+
+    public function reject(Request $request, BoardingHouse $boardingHouse): JsonResponse
+    {
+        $data = $request->validate(['admin_notes' => 'nullable|string']);
+
+        $boardingHouse->update([
+            'approval_status' => 'rejected',
+            'admin_notes'     => $data['admin_notes'] ?? $boardingHouse->admin_notes,
+        ]);
+
+        ActivityLog::create([
+            'user_id'    => $request->user()->id,
+            'action'     => "Rejected boarding house: {$boardingHouse->boarding_name}.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json($boardingHouse->load('owner'));
+    }
+
+    public function myBoardingHouses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->owner) {
+            return response()->json([], 200);
+        }
+        $boardingHouses = $user->owner->boardingHouses()->where('status', 'active')->get();
+        return response()->json($boardingHouses);
     }
 }

@@ -30,7 +30,7 @@ class BoardingHouse extends Model
     protected $fillable = [
         'owner_id', 'boarding_name', 'address', 'description', 'facilities',
         'room_rate', 'total_rooms', 'available_rooms', 'latitude', 'longitude',
-        'image', 'status',
+        'image', 'status', 'approval_status', 'admin_notes',
     ];
 
     protected $appends = ['image_url'];

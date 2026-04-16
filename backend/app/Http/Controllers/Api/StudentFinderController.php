@@ -17,6 +17,7 @@ class StudentFinderController extends Controller
 
         $query = BoardingHouse::with('owner')
             ->where('status', 'active')
+            ->where('approval_status', 'approved')
             ->where('available_rooms', '>', 0);
 
         if ($search = $request->get('search')) {
@@ -59,6 +60,7 @@ class StudentFinderController extends Controller
     {
         $bh = BoardingHouse::with(['owner:id,full_name,contact_number', 'rooms' => fn ($q) => $q->orderBy('room_name')])
             ->where('status', 'active')
+            ->where('approval_status', 'approved')
             ->findOrFail($id);
 
         return response()->json($bh);

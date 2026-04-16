@@ -71,7 +71,7 @@ export default function StudentsReportPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Student No.</TableHead>
+                                    <TableHead>Student ID</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Gender</TableHead>
                                     <TableHead>Course / Year</TableHead>

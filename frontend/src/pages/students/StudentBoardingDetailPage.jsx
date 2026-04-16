@@ -224,15 +224,15 @@ export default function StudentBoardingDetailPage() {
                                 <Heart className="h-8 w-8 text-blue-600 mx-auto mb-3" />
                                 <h3 className="font-semibold text-slate-900 mb-2">Interested in this place?</h3>
                                 <p className="text-sm text-slate-500 mb-4">
-                                    Submit an inquiry and the owner will contact you with more details.
+                                    Submit a reservation and the owner will contact you with more details.
                                 </p>
-                                <Button 
-                                    className="w-full" 
+                                <Button
+                                    className="w-full"
                                     size="lg"
                                     onClick={() => setShowInquiryModal(true)}
                                 >
                                     <MessageCircle className="h-4 w-4 mr-2" />
-                                    Send Inquiry
+                                    Reserve a Room
                                 </Button>
                             </CardContent>
                         </Card>

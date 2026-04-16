@@ -10,16 +10,21 @@ class Student extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_no', 'first_name', 'last_name', 'gender', 'course',
-        'year_level', 'contact_number', 'parent_name', 'parent_contact',
-        'image', 'boarding_house_id',
+        'user_id', 'student_no', 'first_name', 'last_name', 'gender', 'course',
+        'year_level', 'contact_number', 'address', 'parent_name', 'parent_contact',
+        'image', 'boarding_house_id', 'room_id',
     ];
 
-    protected $appends = ['image_url'];
+    protected $appends = ['image_url', 'full_name'];
 
     public function getImageUrlAttribute(): ?string
     {
         return $this->image ? '/storage/' . $this->image : null;
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function boardingHouse()
@@ -27,9 +32,19 @@ class Student extends Model
         return $this->belongsTo(BoardingHouse::class);
     }
 
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
+
     public function boardingHistories()
     {
         return $this->hasMany(StudentBoardingHistory::class)->orderByDesc('boarded_at');
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(StudentDocument::class);
     }
 
     public function getFullNameAttribute(): string

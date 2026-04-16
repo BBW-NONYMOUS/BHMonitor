@@ -117,7 +117,7 @@ export default function BoardingHouseViewPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Student No.</TableHead>
+                                    <TableHead>Student ID</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Course</TableHead>
                                     <TableHead>Gender</TableHead>

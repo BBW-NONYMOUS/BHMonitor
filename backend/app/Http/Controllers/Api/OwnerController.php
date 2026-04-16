@@ -93,4 +93,14 @@ class OwnerController extends Controller
 
         return response()->json(['message' => 'Owner deleted.']);
     }
+
+    public function myBoardingHouses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->owner) {
+            return response()->json([], 200);
+        }
+        $boardingHouses = $user->owner->boardingHouses()->where('status', 'active')->get();
+        return response()->json($boardingHouses);
+    }
 }
