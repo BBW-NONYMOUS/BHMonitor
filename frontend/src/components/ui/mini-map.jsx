@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { cn } from '@/lib/utils';
 
 // SKSU Kalamansig Campus Coordinates
-const SKSU_KALAMANSIG = [6.2126, 124.3133];
+const SKSU_KALAMANSIG = [6.5575957, 124.048627];
 
 // Custom marker for boarding house
 const bhMarkerIcon = L.divIcon({

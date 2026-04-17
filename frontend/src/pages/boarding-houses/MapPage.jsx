@@ -20,7 +20,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // SKSU Kalamansig Campus Coordinates
-const SKSU_KALAMANSIG = [6.2126, 124.3133];
+const SKSU_KALAMANSIG = [6.5575957, 124.048627];
 const DEFAULT_CENTER = SKSU_KALAMANSIG;
 
 // Map tile layers configuration - includes Google-like alternatives (free)

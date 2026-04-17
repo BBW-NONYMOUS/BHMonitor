@@ -14,7 +14,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // SKSU Kalamansig Campus Coordinates
-const SKSU_KALAMANSIG = [6.2126, 124.3133];
+const SKSU_KALAMANSIG = [6.5575957, 124.048627];
 
 // Custom draggable marker icon
 const selectedIcon = L.divIcon({

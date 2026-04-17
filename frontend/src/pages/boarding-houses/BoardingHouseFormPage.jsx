@@ -196,7 +196,7 @@ export default function BoardingHouseFormPage() {
                                             step="any" 
                                             value={form.latitude} 
                                             onChange={set('latitude')} 
-                                            placeholder="e.g. 6.2126" 
+                                            placeholder="e.g. 6.5575957" 
                                         />
                                         {errors.latitude && <p className="text-xs text-red-500">{errors.latitude[0]}</p>}
                                     </div>
@@ -207,7 +207,7 @@ export default function BoardingHouseFormPage() {
                                             step="any" 
                                             value={form.longitude} 
                                             onChange={set('longitude')} 
-                                            placeholder="e.g. 124.3133" 
+                                            placeholder="e.g. 124.048627" 
                                         />
                                         {errors.longitude && <p className="text-xs text-red-500">{errors.longitude[0]}</p>}
                                     </div>
