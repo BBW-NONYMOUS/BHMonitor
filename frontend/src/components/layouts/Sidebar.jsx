@@ -7,7 +7,7 @@ import api from '@/services/api';
 import {
     LayoutDashboard, Users, Building2, Map, UserCog,
     FileText, LogOut, X, Home, Search, BookOpen, GraduationCap,
-    ShieldCheck, Database
+    ShieldCheck, Database, Settings2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,8 +30,10 @@ const navItems = [
         ]
     },
     { to: '/backup', label: 'Backup & Restore', icon: Database, roles: ['admin'] },
+    { to: '/settings', label: 'Settings', icon: Settings2, roles: ['admin', 'owner'] },
     // Student
     { to: '/student-dashboard', label: 'My Dashboard', icon: GraduationCap, roles: ['student'] },
+    { to: '/student-reservations', label: 'My Reservations', icon: BookOpen, roles: ['student'] },
     { to: '/student-documents', label: 'My Documents',  icon: FileText,      roles: ['student'] },
 ];
 
@@ -184,6 +186,21 @@ export default function Sidebar({ open, onClose }) {
                         <LogOut className="h-4 w-4" />
                         Logout
                     </button>
+                    {['admin', 'owner'].includes(user?.role) && (
+                        <NavLink
+                            to="/settings"
+                            onClick={onClose}
+                            className={({ isActive }) => cn(
+                                'mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                                isActive
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                            )}
+                        >
+                            <Settings2 className="h-4 w-4" />
+                            Settings
+                        </NavLink>
+                    )}
                 </div>
             </aside>
         </>

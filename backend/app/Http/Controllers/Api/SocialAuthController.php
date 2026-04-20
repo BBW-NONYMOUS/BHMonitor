@@ -100,9 +100,13 @@ class SocialAuthController extends Controller
             'profile_photo_url' => $user->profile_photo
                 ? '/storage/' . $user->profile_photo
                 : $googleUser->getAvatar(),
+            'full_name'         => $user->owner?->full_name ?? $user->name,
             'owner_id'          => $user->owner?->id,
             'student_id'        => $user->student?->id,
             'student_no'        => $user->student?->student_no,
+            'address'           => $user->student?->address ?? $user->owner?->address,
+            'contact_number'    => $user->student?->contact_number ?? $user->owner?->contact_number,
+            'google_linked'     => (bool) $user->google_id,
         ];
 
         $params = http_build_query([

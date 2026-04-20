@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -104,7 +104,12 @@ export default function StudentInquiryModal({ open, onClose, boardingHouse }) {
                         <p className="text-slate-500 mb-6">
                             Your reservation for <span className="font-medium">{boardingHouse.boarding_name}</span> has been sent to the owner. They will contact you soon.
                         </p>
-                        <Button onClick={handleClose}>Close</Button>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                            <Link to="/student-reservations" onClick={handleClose}>
+                                <Button variant="outline" className="w-full sm:w-auto">View My Reservations</Button>
+                            </Link>
+                            <Button onClick={handleClose}>Close</Button>
+                        </div>
                     </div>
                 ) : (
                     <>

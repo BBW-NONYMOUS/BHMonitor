@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -20,12 +21,25 @@ export default function Navbar({ onMenuClick }) {
 
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <NotificationDropdown />
-                <span className="hidden truncate text-sm text-slate-500 sm:block">
-                    Welcome, <span className="font-medium text-slate-800">{user?.name}</span>
-                </span>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                    {user?.name?.charAt(0).toUpperCase()}
-                </div>
+                <Link
+                    to={user?.role === 'student' ? '/student-dashboard' : '/settings'}
+                    className="flex min-w-0 items-center gap-2 rounded-full px-1 py-1 transition hover:bg-slate-100"
+                >
+                    <span className="hidden truncate text-sm text-slate-500 sm:block">
+                        Welcome, <span className="font-medium text-slate-800">{user?.name}</span>
+                    </span>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600 text-sm font-bold text-white">
+                        {user?.profile_photo_url ? (
+                            <img
+                                src={user.profile_photo_url}
+                                alt={user.name}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            user?.name?.charAt(0).toUpperCase()
+                        )}
+                    </div>
+                </Link>
             </div>
         </header>
     );

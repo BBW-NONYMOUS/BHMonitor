@@ -8,11 +8,25 @@ use App\Models\BoardingHouse;
 use App\Models\Room;
 use App\Models\RoomPhoto;
 use App\Models\Student;
+use App\Models\StudentInquiry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RoomController extends Controller
 {
+    private function authorizeOwnerRoomManagement(Request $request, BoardingHouse $boardingHouse): void
+    {
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            abort(403, 'Only the boarding house owner can manage room assignments.');
+        }
+
+        if ($boardingHouse->owner_id !== $user->owner?->id) {
+            abort(403, 'You do not own this boarding house.');
+        }
+    }
+
     public function index(BoardingHouse $boardingHouse): JsonResponse
     {
         $rooms = $boardingHouse->rooms()
@@ -114,7 +128,7 @@ class RoomController extends Controller
             'price'       => 'required|numeric|min:0',
             'gender_type' => 'nullable|in:Male,Female,Mixed',
             'amenities'   => 'nullable|string|max:500',
-            'photos'      => 'nullable|array|max:6',
+            'photos'      => 'nullable|array|min:3|max:6',
             'photos.*'    => 'image|max:5120',
         ]);
 
@@ -174,6 +188,8 @@ class RoomController extends Controller
      */
     public function addStudent(Request $request, BoardingHouse $boardingHouse, Room $room): JsonResponse
     {
+        $this->authorizeOwnerRoomManagement($request, $boardingHouse);
+
         $data = $request->validate([
             'student_id' => 'required|exists:students,id',
         ]);
@@ -225,6 +241,8 @@ class RoomController extends Controller
      */
     public function removeStudent(Request $request, BoardingHouse $boardingHouse, Room $room, Student $student): JsonResponse
     {
+        $this->authorizeOwnerRoomManagement($request, $boardingHouse);
+
         if ($student->room_id !== $room->id) {
             return response()->json(['message' => 'Student is not in this room.'], 422);
         }
@@ -251,12 +269,25 @@ class RoomController extends Controller
      */
     public function availableStudents(Request $request, BoardingHouse $boardingHouse, Room $room): JsonResponse
     {
-        // Students in this BH not yet assigned to this room
-        $students = Student::where('boarding_house_id', $boardingHouse->id)
+        $this->authorizeOwnerRoomManagement($request, $boardingHouse);
+
+        $approvedStudentIds = StudentInquiry::where('boarding_house_id', $boardingHouse->id)
+            ->where('status', 'approved')
+            ->whereNotNull('student_id')
+            ->pluck('student_id');
+
+        $students = Student::where(function ($query) use ($boardingHouse, $approvedStudentIds) {
+                $query->where('boarding_house_id', $boardingHouse->id);
+
+                if ($approvedStudentIds->isNotEmpty()) {
+                    $query->orWhereIn('id', $approvedStudentIds);
+                }
+            })
             ->where(function ($q) use ($room) {
                 $q->whereNull('room_id')->orWhere('room_id', '!=', $room->id);
             })
             ->select('id', 'first_name', 'last_name', 'student_no', 'gender', 'room_id')
+            ->distinct()
             ->get();
 
         return response()->json($students);

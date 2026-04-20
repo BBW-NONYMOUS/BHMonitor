@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ export default function RegisterStudentPage() {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
     const [registered, setRegistered] = useState(false);
+    const photoInputRef = useRef(null);
 
     // Pre-fill from Google OAuth redirect (?email=...&name=...)
     useEffect(() => {
@@ -35,10 +36,18 @@ export default function RegisterStudentPage() {
                 last_name:  parts.slice(1).join(' ') || p.last_name,
             }));
         }
-    }, []);
+    }, [searchParams]);
     // Profile photo state - REQ-002
     const [profilePhoto, setProfilePhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
+
+    useEffect(() => {
+        return () => {
+            if (photoPreview?.startsWith('blob:')) {
+                URL.revokeObjectURL(photoPreview);
+            }
+        };
+    }, [photoPreview]);
 
     const set = (field) => (e) => {
         setForm(p => ({ ...p, [field]: e.target?.value ?? e }));
@@ -53,15 +62,25 @@ export default function RegisterStudentPage() {
         // Validate file type and size
         if (!file.type.startsWith('image/')) {
             toast.error('Please select an image file');
+            e.target.value = '';
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
             toast.error('Image must be less than 5MB');
+            e.target.value = '';
             return;
+        }
+
+        if (photoPreview?.startsWith('blob:')) {
+            URL.revokeObjectURL(photoPreview);
         }
 
         setProfilePhoto(file);
         setPhotoPreview(URL.createObjectURL(file));
+    };
+
+    const openPhotoPicker = () => {
+        photoInputRef.current?.click();
     };
 
     const removePhoto = () => {
@@ -70,6 +89,9 @@ export default function RegisterStudentPage() {
         }
         setProfilePhoto(null);
         setPhotoPreview(null);
+        if (photoInputRef.current) {
+            photoInputRef.current.value = '';
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -235,18 +257,17 @@ export default function RegisterStudentPage() {
                                     <div className="flex-1">
                                         <Label className="text-sm font-medium">Profile Photo</Label>
                                         <p className="text-xs text-slate-500 mb-2">Optional. Max 5MB. JPG or PNG.</p>
-                                        <label className="cursor-pointer">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handlePhotoSelect}
-                                            />
-                                            <Button type="button" variant="outline" size="sm" className="gap-1">
-                                                <Camera className="h-4 w-4" />
-                                                {photoPreview ? 'Change Photo' : 'Add Photo'}
-                                            </Button>
-                                        </label>
+                                        <input
+                                            ref={photoInputRef}
+                                            type="file"
+                                            accept=".jpg,.jpeg,.png,image/*"
+                                            className="hidden"
+                                            onChange={handlePhotoSelect}
+                                        />
+                                        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={openPhotoPicker}>
+                                            <Camera className="h-4 w-4" />
+                                            {photoPreview ? 'Change Photo' : 'Add Photo'}
+                                        </Button>
                                     </div>
                                 </div>
 

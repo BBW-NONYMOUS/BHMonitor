@@ -47,6 +47,11 @@ class Student extends Model
         return $this->hasMany(StudentDocument::class);
     }
 
+    public function inquiry()
+    {
+        return $this->hasOne(StudentInquiry::class);
+    }
+
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";

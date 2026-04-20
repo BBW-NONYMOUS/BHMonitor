@@ -213,7 +213,7 @@ export default function MapPage() {
     const [showFilters, setShowFilters] = useState(false);
     const [locateTrigger, setLocateTrigger] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [mapStyle, setMapStyle] = useState('street');
+    const [mapStyle, setMapStyle] = useState('satellite');
     
     // Filter states
     const [filters, setFilters] = useState({

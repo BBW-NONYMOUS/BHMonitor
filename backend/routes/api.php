@@ -27,9 +27,6 @@ Route::get('/find-boarding/markers',  [MapController::class, 'publicMarkers']);
 Route::get('/find-boarding/{id}',     [StudentFinderController::class, 'show']);
 
 // ─── Public Reservation (unauthenticated fallback) ─────────────────────────
-Route::post('/reservations', [StudentInquiryController::class, 'store']);
-// Legacy alias kept for backward compat
-Route::post('/student-inquiries', [StudentInquiryController::class, 'store']);
 
 // ─── Authenticated Routes ───────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
@@ -69,6 +66,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/boarding-houses/{boardingHouse}/rooms/{room}/students/{student}', [RoomController::class, 'removeStudent']);
 
     // ─── Reservations (formerly Inquiries) ──────────────────────────────
+    Route::post('/reservations',                                    [StudentInquiryController::class, 'store']);
+    Route::post('/student-inquiries',                               [StudentInquiryController::class, 'store']);
+    Route::get('/my-reservations',                                  [StudentInquiryController::class, 'myReservations']);
     Route::get('/boarding-houses/{boardingHouse}/reservations',     [StudentInquiryController::class, 'index']);
     Route::get('/reservations/counts',                              [StudentInquiryController::class, 'counts']);
     Route::get('/reservations',                                     [StudentInquiryController::class, 'allInquiries']);

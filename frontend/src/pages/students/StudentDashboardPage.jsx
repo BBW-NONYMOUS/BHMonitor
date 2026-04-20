@@ -27,6 +27,7 @@ export default function StudentDashboardPage() {
     const { user } = useAuth();
     const [student, setStudent] = useState(null);
     const [docCount, setDocCount] = useState(0);
+    const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -34,9 +35,11 @@ export default function StudentDashboardPage() {
         Promise.all([
             api.get(`/students/${user.student_id}`),
             api.get(`/students/${user.student_id}/documents`),
-        ]).then(([stuRes, docRes]) => {
+            api.get('/my-reservations'),
+        ]).then(([stuRes, docRes, reservationRes]) => {
             setStudent(stuRes.data);
             setDocCount(docRes.data.length);
+            setReservations(reservationRes.data);
         }).finally(() => setLoading(false));
     }, [user?.student_id]);
 
@@ -53,6 +56,8 @@ export default function StudentDashboardPage() {
     }
 
     const bh = student?.boarding_house;
+    const latestReservation = reservations[0];
+    const activeReservations = reservations.filter((reservation) => ['pending', 'contacted', 'approved'].includes(reservation.status)).length;
 
     return (
         <div className="mx-auto max-w-3xl space-y-6">
@@ -83,8 +88,8 @@ export default function StudentDashboardPage() {
                 </Card>
                 <Card className="text-center">
                     <CardContent className="pt-4 pb-4">
-                        <p className="text-2xl font-bold text-blue-600">{bh ? '1' : '0'}</p>
-                        <p className="text-xs text-slate-500 mt-1">Boarding House</p>
+                        <p className="text-2xl font-bold text-blue-600">{activeReservations}</p>
+                        <p className="text-xs text-slate-500 mt-1">Active Reservations</p>
                     </CardContent>
                 </Card>
                 <Card className="text-center">
@@ -94,6 +99,50 @@ export default function StudentDashboardPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                        <BookOpen className="h-4 w-4" /> Reservation Status
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {latestReservation ? (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="font-medium text-slate-900">{latestReservation.boarding_house?.boarding_name || 'Boarding House'}</p>
+                                    <p className="text-sm text-slate-500">
+                                        Submitted on {new Date(latestReservation.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <Badge variant="outline" className="capitalize">{latestReservation.status}</Badge>
+                            </div>
+                            <p className="text-sm text-slate-600">
+                                {latestReservation.status === 'approved'
+                                    ? 'Your reservation was approved. The owner can now assign you to a room.'
+                                    : latestReservation.status === 'declined'
+                                        ? 'Your latest reservation was declined.'
+                                        : 'Your latest reservation is still being reviewed by the owner.'}
+                            </p>
+                            <Link to="/student-reservations">
+                                <Button variant="outline" size="sm">View All Reservations</Button>
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center py-6 text-center">
+                            <BookOpen className="mb-2 h-8 w-8 text-slate-300" />
+                            <p className="text-sm text-slate-400">You have not made any reservations yet.</p>
+                            <Link to="/find-boarding" className="mt-3">
+                                <Button size="sm" variant="outline">
+                                    <Search className="mr-2 h-4 w-4" />
+                                    Reserve a Boarding House
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Profile */}

@@ -13,25 +13,38 @@ export function AuthProvider({ children }) {
         return localStorage.getItem('is_new_owner') === 'true';
     });
 
+    const syncUser = (nextUser) => {
+        if (nextUser) {
+            localStorage.setItem('auth_user', JSON.stringify(nextUser));
+        } else {
+            localStorage.removeItem('auth_user');
+        }
+
+        setUser(nextUser);
+    };
+
     const login = async (email, password) => {
         const { data } = await api.post('/login', { email, password });
-        // If account is pending or rejected, the API returns 403 — axios will throw
-        // so this line is only reached for approved accounts
+        // If account is pending or rejected, the API returns 403, so this only runs for approved accounts.
         localStorage.setItem('auth_token', data.token);
-        localStorage.setItem('auth_user', JSON.stringify(data.user));
         localStorage.removeItem('is_new_owner');
         setIsNewOwner(false);
-        setUser(data.user);
+        syncUser(data.user);
         return data.user;
     };
 
     // Used by GoogleCallbackPage after OAuth redirect
-    const loginWithToken = (token, user) => {
+    const loginWithToken = (token, nextUser) => {
         localStorage.setItem('auth_token', token);
-        localStorage.setItem('auth_user', JSON.stringify(user));
         localStorage.removeItem('is_new_owner');
         setIsNewOwner(false);
-        setUser(user);
+        syncUser(nextUser);
+    };
+
+    const refreshUser = async () => {
+        const { data } = await api.get('/user');
+        syncUser(data);
+        return data;
     };
 
     const registerStudent = async (formData) => {
@@ -40,7 +53,6 @@ export function AuthProvider({ children }) {
         const { data } = await api.post('/register-student', formData, {
             headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
         });
-        // Returns { account_status: 'pending', message } — no token
         return data;
     };
 
@@ -50,7 +62,6 @@ export function AuthProvider({ children }) {
         const { data } = await api.post('/register-owner', formData, {
             headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
         });
-        // Returns { account_status: 'pending', message } — no token
         return data;
     };
 
@@ -60,23 +71,36 @@ export function AuthProvider({ children }) {
     };
 
     const logout = async () => {
-        try { await api.post('/logout'); } catch (_) {}
+        try {
+            await api.post('/logout');
+        } catch (_) {}
+
         localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
         localStorage.removeItem('is_new_owner');
         setIsNewOwner(false);
-        setUser(null);
+        syncUser(null);
     };
 
-    const isAdmin   = () => user?.role === 'admin';
-    const isOwner   = () => user?.role === 'owner';
+    const isAdmin = () => user?.role === 'admin';
+    const isOwner = () => user?.role === 'owner';
     const isStudent = () => user?.role === 'student';
 
     return (
         <AuthContext.Provider value={{
-            user, login, loginWithToken, logout, registerOwner, registerStudent,
-            loading, isAdmin, isOwner, isStudent,
-            isNewOwner, clearNewOwnerFlag,
+            user,
+            login,
+            loginWithToken,
+            logout,
+            registerOwner,
+            registerStudent,
+            loading,
+            isAdmin,
+            isOwner,
+            isStudent,
+            isNewOwner,
+            clearNewOwnerFlag,
+            refreshUser,
+            syncUser,
         }}>
             {children}
         </AuthContext.Provider>

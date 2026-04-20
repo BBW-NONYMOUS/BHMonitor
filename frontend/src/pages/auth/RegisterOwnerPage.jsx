@@ -1,17 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Home, Loader2, ArrowLeft, Camera, X } from 'lucide-react';
+import { Home, Loader2, ArrowLeft, Camera, X, CheckCircle, Clock } from 'lucide-react';
 import { redirectToGoogleAuth } from '@/lib/googleAuth';
 
 export default function RegisterOwnerPage() {
     const { registerOwner } = useAuth();
-    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [form, setForm] = useState({
         name: '',
@@ -24,23 +23,32 @@ export default function RegisterOwnerPage() {
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
+    const [registered, setRegistered] = useState(false);
+    const photoInputRef = useRef(null);
 
-    // Pre-fill from Google OAuth redirect (?email=...&name=...)
     useEffect(() => {
         const email = searchParams.get('email');
-        const name  = searchParams.get('name');
+        const name = searchParams.get('name');
         if (email || name) {
-            setForm(p => ({
-                ...p,
-                email:     email || p.email,
-                name:      (name || '').split(' ')[0].toLowerCase() || p.name,
-                full_name: name  || p.full_name,
+            setForm((prev) => ({
+                ...prev,
+                email: email || prev.email,
+                name: (name || '').split(' ')[0].toLowerCase() || prev.name,
+                full_name: name || prev.full_name,
             }));
         }
-    }, []);
-    // Profile photo state - REQ-002
+    }, [searchParams]);
+
     const [profilePhoto, setProfilePhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
+
+    useEffect(() => {
+        return () => {
+            if (photoPreview?.startsWith('blob:')) {
+                URL.revokeObjectURL(photoPreview);
+            }
+        };
+    }, [photoPreview]);
 
     const handleChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -49,31 +57,42 @@ export default function RegisterOwnerPage() {
         }
     };
 
-    // Handle profile photo selection - REQ-002
     const handlePhotoSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type and size
         if (!file.type.startsWith('image/')) {
             toast.error('Please select an image file');
+            e.target.value = '';
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
             toast.error('Image must be less than 5MB');
+            e.target.value = '';
             return;
+        }
+
+        if (photoPreview?.startsWith('blob:')) {
+            URL.revokeObjectURL(photoPreview);
         }
 
         setProfilePhoto(file);
         setPhotoPreview(URL.createObjectURL(file));
     };
 
+    const openPhotoPicker = () => {
+        photoInputRef.current?.click();
+    };
+
     const removePhoto = () => {
-        if (photoPreview && photoPreview.startsWith('blob:')) {
+        if (photoPreview?.startsWith('blob:')) {
             URL.revokeObjectURL(photoPreview);
         }
         setProfilePhoto(null);
         setPhotoPreview(null);
+        if (photoInputRef.current) {
+            photoInputRef.current.value = '';
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -82,19 +101,19 @@ export default function RegisterOwnerPage() {
         setErrors({});
 
         try {
-            // Use FormData if there's a profile photo
             let payload;
             if (profilePhoto) {
                 payload = new FormData();
-                Object.entries(form).forEach(([k, v]) => { if (v !== '') payload.append(k, v); });
+                Object.entries(form).forEach(([k, v]) => {
+                    if (v !== '') payload.append(k, v);
+                });
                 payload.append('profile_photo', profilePhoto);
             } else {
                 payload = form;
             }
 
             await registerOwner(payload);
-            toast.success('Registration successful! Welcome to Boarders Monitor.');
-            navigate('/dashboard');
+            setRegistered(true);
         } catch (err) {
             if (err.response?.data?.errors) {
                 setErrors(err.response.data.errors);
@@ -105,6 +124,35 @@ export default function RegisterOwnerPage() {
             setLoading(false);
         }
     };
+
+    if (registered) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-blue-900 p-4">
+                <div className="w-full max-w-md">
+                    <Card className="text-center shadow-2xl">
+                        <CardContent className="space-y-4 pt-10 pb-10">
+                            <div className="flex justify-center">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                                    <CheckCircle className="h-8 w-8 text-green-600" />
+                                </div>
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-900">Registration Submitted</h2>
+                            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-800">
+                                <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                                <div>
+                                    <p className="font-semibold">Awaiting Admin Approval</p>
+                                    <p className="mt-1">Your owner account has been submitted and is pending approval.</p>
+                                </div>
+                            </div>
+                            <Link to="/login">
+                                <Button className="mt-2 w-full">Back to Login</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-blue-900 p-4">
@@ -134,11 +182,10 @@ export default function RegisterOwnerPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {/* Google register */}
                         <button
                             type="button"
                             onClick={redirectToGoogleAuth}
-                            className="w-full flex items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors mb-4"
+                            className="mb-4 flex w-full items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                         >
                             <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -153,7 +200,7 @@ export default function RegisterOwnerPage() {
                                 <div className="w-full border-t border-slate-200" />
                             </div>
                             <div className="relative flex justify-center">
-                                <span className="bg-white px-3 text-xs text-slate-400 uppercase tracking-wider">or register with email</span>
+                                <span className="bg-white px-3 text-xs uppercase tracking-wider text-slate-400">or register with email</span>
                             </div>
                         </div>
 
@@ -166,25 +213,12 @@ export default function RegisterOwnerPage() {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label htmlFor="name">Username</Label>
-                                        <Input
-                                            id="name"
-                                            placeholder="johndoe"
-                                            value={form.name}
-                                            onChange={handleChange('name')}
-                                            required
-                                        />
+                                        <Input id="name" placeholder="johndoe" value={form.name} onChange={handleChange('name')} required />
                                         {errors.name && <p className="text-xs text-red-500">{errors.name[0]}</p>}
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="email">Email</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="john@example.com"
-                                            value={form.email}
-                                            onChange={handleChange('email')}
-                                            required
-                                        />
+                                        <Input id="email" type="email" placeholder="john@example.com" value={form.email} onChange={handleChange('email')} required />
                                         {errors.email && <p className="text-xs text-red-500">{errors.email[0]}</p>}
                                     </div>
                                 </div>
@@ -192,26 +226,12 @@ export default function RegisterOwnerPage() {
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label htmlFor="password">Password</Label>
-                                        <Input
-                                            id="password"
-                                            type="password"
-                                            placeholder="Enter password"
-                                            value={form.password}
-                                            onChange={handleChange('password')}
-                                            required
-                                        />
+                                        <Input id="password" type="password" placeholder="Enter password" value={form.password} onChange={handleChange('password')} required />
                                         {errors.password && <p className="text-xs text-red-500">{errors.password[0]}</p>}
                                     </div>
                                     <div className="space-y-1">
                                         <Label htmlFor="password_confirmation">Confirm Password</Label>
-                                        <Input
-                                            id="password_confirmation"
-                                            type="password"
-                                            placeholder="Confirm password"
-                                            value={form.password_confirmation}
-                                            onChange={handleChange('password_confirmation')}
-                                            required
-                                        />
+                                        <Input id="password_confirmation" type="password" placeholder="Confirm password" value={form.password_confirmation} onChange={handleChange('password_confirmation')} required />
                                     </div>
                                 </div>
                             </div>
@@ -221,7 +241,6 @@ export default function RegisterOwnerPage() {
                                     Owner Information
                                 </h3>
 
-                                {/* Profile Photo Upload - REQ-002 */}
                                 <div className="flex items-center gap-4 py-2">
                                     <div className="relative">
                                         {photoPreview ? (
@@ -229,60 +248,48 @@ export default function RegisterOwnerPage() {
                                                 <img
                                                     src={photoPreview}
                                                     alt="Profile preview"
-                                                    className="h-20 w-20 rounded-full object-cover border-2 border-blue-200"
+                                                    className="h-20 w-20 rounded-full border-2 border-blue-200 object-cover"
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={removePhoto}
-                                                    className="absolute -top-1 -right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white"
+                                                    className="absolute -top-1 -right-1 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="h-20 w-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+                                            <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-slate-300 bg-slate-100">
                                                 <Camera className="h-8 w-8 text-slate-400" />
                                             </div>
                                         )}
                                     </div>
                                     <div className="flex-1">
                                         <Label className="text-sm font-medium">Profile Photo</Label>
-                                        <p className="text-xs text-slate-500 mb-2">Optional. Max 5MB. JPG or PNG.</p>
-                                        <label className="cursor-pointer">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handlePhotoSelect}
-                                            />
-                                            <Button type="button" variant="outline" size="sm" className="gap-1">
-                                                <Camera className="h-4 w-4" />
-                                                {photoPreview ? 'Change Photo' : 'Add Photo'}
-                                            </Button>
-                                        </label>
+                                        <p className="mb-2 text-xs text-slate-500">Optional. Max 5MB. JPG or PNG.</p>
+                                        <input
+                                            ref={photoInputRef}
+                                            type="file"
+                                            accept=".jpg,.jpeg,.png,image/*"
+                                            className="hidden"
+                                            onChange={handlePhotoSelect}
+                                        />
+                                        <Button type="button" variant="outline" size="sm" className="gap-1" onClick={openPhotoPicker}>
+                                            <Camera className="h-4 w-4" />
+                                            {photoPreview ? 'Change Photo' : 'Add Photo'}
+                                        </Button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-1">
                                     <Label htmlFor="full_name">Full Name</Label>
-                                    <Input
-                                        id="full_name"
-                                        placeholder="Juan Dela Cruz"
-                                        value={form.full_name}
-                                        onChange={handleChange('full_name')}
-                                        required
-                                    />
+                                    <Input id="full_name" placeholder="Juan Dela Cruz" value={form.full_name} onChange={handleChange('full_name')} required />
                                     {errors.full_name && <p className="text-xs text-red-500">{errors.full_name[0]}</p>}
                                 </div>
 
                                 <div className="space-y-1">
                                     <Label htmlFor="contact_number">Contact Number</Label>
-                                    <Input
-                                        id="contact_number"
-                                        placeholder="09171234567"
-                                        value={form.contact_number}
-                                        onChange={handleChange('contact_number')}
-                                    />
+                                    <Input id="contact_number" placeholder="09171234567" value={form.contact_number} onChange={handleChange('contact_number')} />
                                     {errors.contact_number && <p className="text-xs text-red-500">{errors.contact_number[0]}</p>}
                                 </div>
 
@@ -302,7 +309,7 @@ export default function RegisterOwnerPage() {
 
                             <Button type="submit" className="w-full" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {loading ? 'Creating Account...' : 'Create Account'}
+                                {loading ? 'Submitting...' : 'Create Account'}
                             </Button>
 
                             <p className="text-center text-sm text-slate-500">

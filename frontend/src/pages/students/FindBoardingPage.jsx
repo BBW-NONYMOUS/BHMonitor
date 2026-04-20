@@ -124,7 +124,11 @@ export default function FindBoardingPage() {
     const fetchResults = async () => {
         setLoading(true);
         try {
-            const params = { ...filters, ...(coords ? { lat: coords.lat, lng: coords.lng } : {}) };
+            const params = {
+                ...filters,
+                ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+                ...(availabilityFilter.length > 0 ? { availability: availabilityFilter.join(',') } : {}),
+            };
             const { data } = await api.get('/find-boarding', { params });
             setResults(data.data || data);
         } finally {
@@ -141,7 +145,7 @@ export default function FindBoardingPage() {
         }
     };
 
-    useEffect(() => { fetchResults(); }, [filters]);
+    useEffect(() => { fetchResults(); }, [filters, coords, availabilityFilter]);
     useEffect(() => { fetchMapMarkers(); }, []);
 
     // Add distance to markers and apply availability filter

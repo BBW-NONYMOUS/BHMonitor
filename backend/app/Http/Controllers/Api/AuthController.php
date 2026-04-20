@@ -10,10 +10,24 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    private function storeProfilePhoto(Request $request): ?string
+    {
+        if (!$request->hasFile('profile_photo')) {
+            return null;
+        }
+
+        $request->validate([
+            'profile_photo' => 'image|max:5120',
+        ]);
+
+        return $request->file('profile_photo')->store('avatars', 'public');
+    }
+
     public function login(Request $request): JsonResponse
     {
         $request->validate([
@@ -84,7 +98,10 @@ class AuthController extends Controller
             'year_level'     => 'nullable|string|max:50',
             'contact_number' => 'nullable|string|max:20',
             'address'        => 'nullable|string|max:500',
+            'profile_photo'  => 'nullable|image|max:5120',
         ]);
+
+        $profilePhoto = $this->storeProfilePhoto($request);
 
         // If a student record with this student_no already exists, link to it
         $existingStudent = Student::where('student_no', $data['student_no'])->first();
@@ -104,6 +121,7 @@ class AuthController extends Controller
             'password'       => Hash::make($data['password']),
             'role'           => 'student',
             'account_status' => 'pending', // Students require admin approval
+            'profile_photo'  => $profilePhoto,
         ]);
 
         if ($existingStudent) {
@@ -147,7 +165,10 @@ class AuthController extends Controller
             'full_name'      => 'required|string|max:255',
             'contact_number' => 'nullable|string|max:20',
             'address'        => 'nullable|string',
+            'profile_photo'  => 'nullable|image|max:5120',
         ]);
+
+        $profilePhoto = $this->storeProfilePhoto($request);
 
         $user = User::create([
             'name'           => $data['name'],
@@ -155,6 +176,7 @@ class AuthController extends Controller
             'password'       => Hash::make($data['password']),
             'role'           => 'owner',
             'account_status' => 'pending', // Owners require admin approval
+            'profile_photo'  => $profilePhoto,
         ]);
 
         Owner::create([
@@ -181,21 +203,95 @@ class AuthController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         /** @var \App\Models\User $user */
-        $user = $request->user();
+        $user = $request->user()->loadMissing('owner', 'student');
 
-        $data = $request->validate([
+        $rules = [
             'name'  => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
-        ]);
+            'current_password' => 'nullable|string',
+            'new_password'     => 'nullable|string|min:8|confirmed',
+        ];
 
-        if ($request->hasFile('profile_photo')) {
-            $request->validate(['profile_photo' => 'image|max:5120']); // max 5MB
-            $data['profile_photo'] = $request->file('profile_photo')->store('avatars', 'public');
+        if ($user->isOwner()) {
+            $rules['full_name'] = 'sometimes|string|max:255';
+            $rules['contact_number'] = 'nullable|string|max:20';
+            $rules['address'] = 'nullable|string|max:500';
         }
 
-        $user->update($data);
+        $data = $request->validate($rules);
 
-        return response()->json($this->userPayload($user->fresh()->load('owner', 'student')));
+        $userUpdates = [];
+
+        if (array_key_exists('name', $data)) {
+            $userUpdates['name'] = $data['name'];
+        }
+
+        if (array_key_exists('email', $data)) {
+            $userUpdates['email'] = $data['email'];
+        }
+
+        if (!empty($data['new_password'])) {
+            if (empty($data['current_password']) || !Hash::check($data['current_password'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => ['The current password is incorrect.'],
+                ]);
+            }
+
+            $userUpdates['password'] = Hash::make($data['new_password']);
+        }
+
+        $profilePhoto = $this->storeProfilePhoto($request);
+        if ($profilePhoto) {
+            if ($user->profile_photo) {
+                Storage::disk('public')->delete($user->profile_photo);
+            }
+
+            $userUpdates['profile_photo'] = $profilePhoto;
+        }
+
+        if ($userUpdates !== []) {
+            $user->update($userUpdates);
+        }
+
+        if ($user->isOwner()) {
+            $ownerUpdates = [];
+
+            if (array_key_exists('full_name', $data)) {
+                $ownerUpdates['full_name'] = $data['full_name'];
+            }
+
+            if (array_key_exists('contact_number', $data)) {
+                $ownerUpdates['contact_number'] = $data['contact_number'];
+            }
+
+            if (array_key_exists('address', $data)) {
+                $ownerUpdates['address'] = $data['address'];
+            }
+
+            if (array_key_exists('email', $userUpdates)) {
+                $ownerUpdates['email'] = $userUpdates['email'];
+            }
+
+            if ($ownerUpdates !== []) {
+                $user->owner()->updateOrCreate(
+                    ['user_id' => $user->id],
+                    $ownerUpdates
+                );
+            }
+        }
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => !empty($data['new_password'])
+                ? "User {$user->name} updated account settings and password."
+                : "User {$user->name} updated account settings.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Settings updated successfully.',
+            'user' => $this->userPayload($user->fresh()->load('owner', 'student')),
+        ]);
     }
 
     public function userPayload(User $user): array
@@ -207,9 +303,13 @@ class AuthController extends Controller
             'role'                => $user->role,
             'account_status'      => $user->account_status ?? 'approved',
             'profile_photo_url'   => $user->profile_photo ? '/storage/' . $user->profile_photo : null,
+            'full_name'           => $user->owner?->full_name ?? $user->name,
             'owner_id'            => $user->owner?->id,
             'student_id'          => $user->student?->id,
             'student_no'          => $user->student?->student_no,
+            'address'             => $user->student?->address ?? $user->owner?->address,
+            'contact_number'      => $user->student?->contact_number ?? $user->owner?->contact_number,
+            'google_linked'       => (bool) $user->google_id,
         ];
     }
 }

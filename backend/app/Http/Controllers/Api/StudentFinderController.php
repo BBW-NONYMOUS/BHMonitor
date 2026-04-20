@@ -17,8 +17,7 @@ class StudentFinderController extends Controller
 
         $query = BoardingHouse::with('owner')
             ->where('status', 'active')
-            ->where('approval_status', 'approved')
-            ->where('available_rooms', '>', 0);
+            ->where('approval_status', 'approved');
 
         if ($search = $request->get('search')) {
             $query->where(function ($q) use ($search) {
@@ -35,6 +34,25 @@ class StudentFinderController extends Controller
         $genderType = $request->get('gender_type');
         if ($genderType && $genderType !== 'all') {
             $query->whereHas('rooms', fn ($q) => $q->where('gender_type', $genderType)->where('available_slots', '>', 0));
+        }
+        if ($availability = $request->get('availability')) {
+            $statuses = array_filter(explode(',', (string) $availability));
+            if (!empty($statuses)) {
+                $query->where(function ($q) use ($statuses) {
+                    if (in_array('available', $statuses, true)) {
+                        $q->orWhere('available_rooms', '>=', 5);
+                    }
+                    if (in_array('limited', $statuses, true)) {
+                        $q->orWhere(function ($limited) {
+                            $limited->where('available_rooms', '>', 0)
+                                ->where('available_rooms', '<', 5);
+                        });
+                    }
+                    if (in_array('full', $statuses, true)) {
+                        $q->orWhere('available_rooms', '<=', 0);
+                    }
+                });
+            }
         }
 
         // Nearest: fetch all matching records, compute distance in PHP, sort, return
@@ -58,7 +76,7 @@ class StudentFinderController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $bh = BoardingHouse::with(['owner:id,full_name,contact_number', 'rooms' => fn ($q) => $q->orderBy('room_name')])
+        $bh = BoardingHouse::with(['owner:id,full_name,contact_number', 'rooms' => fn ($q) => $q->with('photos')->orderBy('room_name')])
             ->where('status', 'active')
             ->where('approval_status', 'approved')
             ->findOrFail($id);

@@ -7,13 +7,14 @@ import api from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-    ArrowLeft, MapPin, Phone, Mail, User, Home, BedDouble, 
-    Users, Wifi, Car, Shield, Clock, Heart, MessageCircle, ExternalLink
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+    ArrowLeft, MapPin, Phone, Mail, User, Home, BedDouble,
+    Users, Wifi, Car, Shield, Clock, Heart, MessageCircle, ExternalLink,
+    ChevronLeft, ChevronRight, X, ImageIcon
 } from 'lucide-react';
 import StudentInquiryModal from './StudentInquiryModal';
 
-// Fix Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -50,11 +51,168 @@ function FacilityBadge({ facility }) {
     );
 }
 
+function RoomPhotoLightbox({ photos, initialIndex, onClose }) {
+    const [current, setCurrent] = useState(initialIndex);
+
+    const prev = () => setCurrent(i => (i - 1 + photos.length) % photos.length);
+    const next = () => setCurrent(i => (i + 1) % photos.length);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'ArrowLeft') prev();
+            if (e.key === 'ArrowRight') next();
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
+    const src = photos[current]?.photo_url || `/storage/${photos[current]?.photo_path}`;
+
+    return (
+        <Dialog open onOpenChange={onClose}>
+            <DialogContent className="max-w-3xl p-0 bg-black border-0 overflow-hidden">
+                <div className="relative flex items-center justify-center min-h-[400px]">
+                    <button
+                        onClick={onClose}
+                        className="absolute top-3 right-3 z-10 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+
+                    <img
+                        src={src}
+                        alt={`Room photo ${current + 1}`}
+                        className="max-h-[70vh] w-full object-contain"
+                    />
+
+                    {photos.length > 1 && (
+                        <>
+                            <button
+                                onClick={prev}
+                                className="absolute left-3 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+                            >
+                                <ChevronLeft className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={next}
+                                className="absolute right-3 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+                            >
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </>
+                    )}
+
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {photos.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrent(i)}
+                                className={`h-1.5 rounded-full transition-all ${i === current ? 'w-5 bg-white' : 'w-1.5 bg-white/50'}`}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {photos.length > 1 && (
+                    <div className="flex gap-1.5 overflow-x-auto bg-black/90 p-2">
+                        {photos.map((photo, i) => {
+                            const thumbSrc = photo.photo_url || `/storage/${photo.photo_path}`;
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => setCurrent(i)}
+                                    className={`shrink-0 h-14 w-14 overflow-hidden rounded border-2 transition-all ${i === current ? 'border-white' : 'border-transparent opacity-60 hover:opacity-90'}`}
+                                >
+                                    <img src={thumbSrc} alt="" className="h-full w-full object-cover" />
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function RoomCard({ room, onViewPhoto }) {
+    const photos = room.photos || [];
+    const coverSrc = photos[0] ? (photos[0].photo_url || `/storage/${photos[0].photo_path}`) : null;
+
+    return (
+        <div className="border rounded-lg overflow-hidden hover:border-blue-200 transition-colors">
+            {coverSrc ? (
+                <div className="relative">
+                    <img
+                        src={coverSrc}
+                        alt={room.room_name}
+                        className="w-full h-40 object-cover cursor-pointer"
+                        onClick={() => onViewPhoto(room, 0)}
+                    />
+                    {photos.length > 1 && (
+                        <button
+                            onClick={() => onViewPhoto(room, 0)}
+                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+                        >
+                            <ImageIcon className="h-3 w-3" />
+                            {photos.length} photos
+                        </button>
+                    )}
+                    {photos.length > 1 && (
+                        <div className="absolute bottom-2 left-2 flex gap-1">
+                            {photos.slice(1, 4).map((photo, i) => {
+                                const src = photo.photo_url || `/storage/${photo.photo_path}`;
+                                return (
+                                    <button
+                                        key={i}
+                                        onClick={() => onViewPhoto(room, i + 1)}
+                                        className="h-10 w-10 overflow-hidden rounded border border-white/70"
+                                    >
+                                        <img src={src} alt="" className="h-full w-full object-cover" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="flex h-28 items-center justify-center bg-slate-100">
+                    <BedDouble className="h-8 w-8 text-slate-300" />
+                </div>
+            )}
+
+            <div className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-slate-900">{room.room_name}</h4>
+                    <span className="text-lg font-bold text-blue-600">
+                        ₱{Number(room.price).toLocaleString()}<span className="text-xs font-normal text-slate-400">/mo</span>
+                    </span>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-slate-500">
+                    <span className="flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" />
+                        {room.available_slots}/{room.capacity} slots
+                    </span>
+                    {room.gender_type && (
+                        <Badge variant="secondary" className="text-xs">
+                            {room.gender_type}
+                        </Badge>
+                    )}
+                </div>
+                {room.amenities && (
+                    <p className="text-xs text-slate-400 mt-2">{room.amenities}</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function StudentBoardingDetailPage() {
     const { id } = useParams();
     const [bh, setBh] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showInquiryModal, setShowInquiryModal] = useState(false);
+    const [lightbox, setLightbox] = useState(null); // { photos, index }
 
     useEffect(() => {
         setLoading(true);
@@ -63,6 +221,12 @@ export default function StudentBoardingDetailPage() {
             .catch(err => console.error(err))
             .finally(() => setLoading(false));
     }, [id]);
+
+    const openLightbox = (room, index) => {
+        if (room.photos?.length) {
+            setLightbox({ photos: room.photos, index });
+        }
+    };
 
     if (loading) {
         return (
@@ -92,7 +256,6 @@ export default function StudentBoardingDetailPage() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Header */}
             <div className="bg-gradient-to-br from-slate-900 to-blue-900 text-white py-8 px-4">
                 <div className="max-w-4xl mx-auto">
                     <Link to="/find-boarding" className="inline-flex items-center text-blue-300 hover:text-blue-200 mb-4 transition-colors">
@@ -128,20 +291,17 @@ export default function StudentBoardingDetailPage() {
 
             <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
-                        {/* Image */}
                         {bh.image_url && (
                             <Card className="overflow-hidden">
-                                <img 
-                                    src={bh.image_url} 
-                                    alt={bh.boarding_name} 
+                                <img
+                                    src={bh.image_url}
+                                    alt={bh.boarding_name}
                                     className="w-full h-64 object-cover"
                                 />
                             </Card>
                         )}
 
-                        {/* Description */}
                         {bh.description && (
                             <Card>
                                 <CardHeader>
@@ -153,7 +313,6 @@ export default function StudentBoardingDetailPage() {
                             </Card>
                         )}
 
-                        {/* Facilities */}
                         {facilities.length > 0 && (
                             <Card>
                                 <CardHeader>
@@ -169,7 +328,6 @@ export default function StudentBoardingDetailPage() {
                             </Card>
                         )}
 
-                        {/* Available Rooms */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -185,30 +343,13 @@ export default function StudentBoardingDetailPage() {
                                         <p className="text-sm mt-1">Submit an inquiry to be notified when rooms become available.</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {availableRooms.map(room => (
-                                            <div key={room.id} className="border rounded-lg p-4 hover:border-blue-200 transition-colors">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="font-medium text-slate-900">{room.room_name}</h4>
-                                                    <span className="text-lg font-bold text-blue-600">
-                                                        ₱{Number(room.price).toLocaleString()}<span className="text-xs font-normal text-slate-400">/mo</span>
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-4 text-sm text-slate-500">
-                                                    <span className="flex items-center gap-1">
-                                                        <Users className="h-3.5 w-3.5" />
-                                                        {room.available_slots}/{room.capacity} slots
-                                                    </span>
-                                                    {room.gender_type && (
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            {room.gender_type}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                {room.description && (
-                                                    <p className="text-xs text-slate-400 mt-2">{room.description}</p>
-                                                )}
-                                            </div>
+                                            <RoomCard
+                                                key={room.id}
+                                                room={room}
+                                                onViewPhoto={openLightbox}
+                                            />
                                         ))}
                                     </div>
                                 )}
@@ -216,9 +357,7 @@ export default function StudentBoardingDetailPage() {
                         </Card>
                     </div>
 
-                    {/* Sidebar */}
                     <div className="space-y-6">
-                        {/* CTA Card */}
                         <Card className="border-blue-200 bg-blue-50/50">
                             <CardContent className="p-6 text-center">
                                 <Heart className="h-8 w-8 text-blue-600 mx-auto mb-3" />
@@ -237,7 +376,6 @@ export default function StudentBoardingDetailPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Owner Info */}
                         {bh.owner && (
                             <Card>
                                 <CardHeader>
@@ -251,7 +389,6 @@ export default function StudentBoardingDetailPage() {
                             </Card>
                         )}
 
-                        {/* Requirements */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base">Requirements</CardTitle>
@@ -281,7 +418,6 @@ export default function StudentBoardingDetailPage() {
                             </CardContent>
                         </Card>
 
-                        {/* Location with Map */}
                         {(bh.latitude && bh.longitude) && (
                             <Card>
                                 <CardHeader>
@@ -292,9 +428,9 @@ export default function StudentBoardingDetailPage() {
                                 </CardHeader>
                                 <CardContent className="p-0">
                                     <div className="h-[250px] w-full">
-                                        <MapContainer 
-                                            center={[bh.latitude, bh.longitude]} 
-                                            zoom={16} 
+                                        <MapContainer
+                                            center={[bh.latitude, bh.longitude]}
+                                            zoom={16}
                                             style={{ height: '100%', width: '100%' }}
                                             scrollWheelZoom={false}
                                         >
@@ -313,7 +449,7 @@ export default function StudentBoardingDetailPage() {
                                         </MapContainer>
                                     </div>
                                     <div className="p-3 border-t">
-                                        <a 
+                                        <a
                                             href={`https://www.google.com/maps/search/?api=1&query=${bh.latitude},${bh.longitude}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
@@ -332,12 +468,19 @@ export default function StudentBoardingDetailPage() {
                 </div>
             </div>
 
-            {/* Inquiry Modal */}
-            <StudentInquiryModal 
+            <StudentInquiryModal
                 open={showInquiryModal}
                 onClose={() => setShowInquiryModal(false)}
                 boardingHouse={bh}
             />
+
+            {lightbox && (
+                <RoomPhotoLightbox
+                    photos={lightbox.photos}
+                    initialIndex={lightbox.index}
+                    onClose={() => setLightbox(null)}
+                />
+            )}
         </div>
     );
 }

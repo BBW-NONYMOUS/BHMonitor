@@ -17,10 +17,12 @@ import StudentDocumentsPage from '@/pages/students/StudentDocumentsPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import StudentsPage from '@/pages/students/StudentsPage';
 import StudentFormPage from '@/pages/students/StudentFormPage';
+import DirectAddPage from '@/pages/students/DirectAddPage';
 import StudentViewPage from '@/pages/students/StudentViewPage';
 import AssignBoardingPage from '@/pages/students/AssignBoardingPage';
 import FindBoardingPage from '@/pages/students/FindBoardingPage';
 import StudentBoardingDetailPage from '@/pages/students/StudentBoardingDetailPage';
+import StudentReservationsPage from '@/pages/students/StudentReservationsPage';
 import InquiriesPage from '@/pages/owners/InquiriesPage';
 import AllInquiriesPage from '@/pages/owners/AllInquiriesPage';
 import BoardingHousesPage from '@/pages/boarding-houses/BoardingHousesPage';
@@ -36,6 +38,7 @@ import StudentsReportPage from '@/pages/reports/StudentsReportPage';
 import BoardingReportPage from '@/pages/reports/BoardingReportPage';
 import OccupancyReportPage from '@/pages/reports/OccupancyReportPage';
 import GeoReportPage from '@/pages/reports/GeoReportPage';
+import SettingsPage from '@/pages/settings/SettingsPage';
 
 import './index.css';
 
@@ -62,6 +65,13 @@ function StudentRoute({ children }) {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
     if (user.role !== 'student') return <Navigate to="/dashboard" replace />;
+    return children;
+}
+
+function AdminOwnerRoute({ children }) {
+    const { user } = useAuth();
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role === 'student') return <Navigate to="/student-dashboard" replace />;
     return children;
 }
 
@@ -96,6 +106,7 @@ function App() {
                     {/* Students */}
                     <Route path="students" element={<StudentsPage />} />
                     <Route path="students/create" element={<StudentFormPage />} />
+                    <Route path="students/direct-add" element={<DirectAddPage />} />
                     <Route path="students/:id/edit" element={<StudentFormPage />} />
                     <Route path="students/:id" element={<StudentViewPage />} />
                     <Route path="students/:id/assign" element={<AssignBoardingPage />} />
@@ -122,6 +133,7 @@ function App() {
                     {/* Admin-only tools */}
                     <Route path="accounts" element={<AdminRoute><AccountApprovalsPage /></AdminRoute>} />
                     <Route path="backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
+                    <Route path="settings" element={<AdminOwnerRoute><SettingsPage /></AdminOwnerRoute>} />
 
                     {/* Reports */}
                     <Route path="reports/students" element={<StudentsReportPage />} />
@@ -134,6 +146,7 @@ function App() {
                 <Route element={<StudentRoute><AppLayout /></StudentRoute>}>
                     <Route path="student-dashboard" element={<StudentDashboardPage />} />
                     <Route path="student-documents" element={<StudentDocumentsPage />} />
+                    <Route path="student-reservations" element={<StudentReservationsPage />} />
                 </Route>
 
                 {/* Fallback */}

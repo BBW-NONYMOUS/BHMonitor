@@ -15,6 +15,7 @@ class StudentInquiry extends Model
         'full_name',
         'email',
         'contact_number',
+        'address',
         'student_no',
         'course',
         'year_level',

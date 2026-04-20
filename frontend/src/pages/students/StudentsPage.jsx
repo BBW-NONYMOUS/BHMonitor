@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Search, Eye, Pencil, Trash2, UserCheck, UserPlus, ClipboardList } from 'lucide-react';
+import { ChevronDown, Search, Eye, Pencil, Trash2, UserCheck, UserPlus, ClipboardList, FileCheck, FilePlus } from 'lucide-react';
 
 export default function StudentsPage() {
     const navigate = useNavigate();
@@ -101,13 +101,14 @@ export default function StudentsPage() {
                                     <TableHead>Course / Year</TableHead>
                                     <TableHead>Boarding House</TableHead>
                                     <TableHead>Gender</TableHead>
+                                    <TableHead>Source</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {students.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-10 text-center text-slate-400">No students found.</TableCell>
+                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400">No students found.</TableCell>
                                     </TableRow>
                                 ) : students.map((student) => (
                                     <TableRow key={student.id}>
@@ -129,6 +130,19 @@ export default function StudentsPage() {
                                                 <Badge variant={student.gender === 'Male' ? 'default' : 'secondary'}>
                                                     {student.gender}
                                                 </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {student.inquiry ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">
+                                                    <FileCheck className="h-3 w-3" />
+                                                    Via Reservation
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-500">
+                                                    <FilePlus className="h-3 w-3" />
+                                                    Manual
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">

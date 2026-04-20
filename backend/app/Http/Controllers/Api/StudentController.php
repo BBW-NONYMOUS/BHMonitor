@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
+use App\Models\Room;
 use App\Models\Student;
 use App\Models\StudentBoardingHistory;
 use App\Models\StudentInquiry;
@@ -17,11 +18,22 @@ class StudentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
-        $query = Student::with(['boardingHouse.owner', 'room:id,room_name']);
+        $query = Student::with(['boardingHouse.owner', 'room:id,room_name', 'inquiry:id,student_id,status']);
 
         if ($user->isOwner()) {
             $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
-            $query->whereIn('boarding_house_id', $bhIds);
+            $approvedStudentIds = StudentInquiry::whereIn('boarding_house_id', $bhIds)
+                ->where('status', 'approved')
+                ->whereNotNull('student_id')
+                ->pluck('student_id');
+
+            $query->where(function ($q) use ($bhIds, $approvedStudentIds) {
+                $q->whereIn('boarding_house_id', $bhIds);
+
+                if ($approvedStudentIds->isNotEmpty()) {
+                    $q->orWhereIn('id', $approvedStudentIds);
+                }
+            });
         }
 
         if ($search = $request->get('search')) {
@@ -59,7 +71,34 @@ class StudentController extends Controller
             $data['image'] = $request->file('image')->store('students', 'public');
         }
 
+        $room = null;
+        if (!empty($data['room_id'])) {
+            $room = Room::findOrFail($data['room_id']);
+
+            if (empty($data['boarding_house_id'])) {
+                $data['boarding_house_id'] = $room->boarding_house_id;
+            } elseif ((int) $room->boarding_house_id !== (int) $data['boarding_house_id']) {
+                throw ValidationException::withMessages([
+                    'room_id' => ['The selected room does not belong to the selected boarding house.'],
+                ]);
+            }
+
+            if ($room->students()->count() >= $room->capacity) {
+                throw ValidationException::withMessages([
+                    'room_id' => ['The selected room is already at full capacity.'],
+                ]);
+            }
+        }
+
         $student = Student::create($data);
+
+        if ($room) {
+            $studentCount = $room->students()->count();
+            $room->update([
+                'occupied_slots'  => $studentCount,
+                'available_slots' => max(0, $room->capacity - $studentCount),
+            ]);
+        }
 
         if (!empty($data['boarding_house_id'])) {
             StudentBoardingHistory::create([
@@ -104,6 +143,24 @@ class StudentController extends Controller
             return response()->json(['message' => 'A student with this student number already exists.'], 422);
         }
 
+        $boardingHouseId = $data['boarding_house_id'] ?? $reservation->boarding_house_id;
+        $room = null;
+        if (!empty($data['room_id'])) {
+            $room = Room::findOrFail($data['room_id']);
+
+            if ((int) $room->boarding_house_id !== (int) $boardingHouseId) {
+                throw ValidationException::withMessages([
+                    'room_id' => ['The selected room does not belong to the selected boarding house.'],
+                ]);
+            }
+
+            if ($room->students()->count() >= $room->capacity) {
+                throw ValidationException::withMessages([
+                    'room_id' => ['The selected room is already at full capacity.'],
+                ]);
+            }
+        }
+
         $student = Student::create([
             'student_no'        => $reservation->student_no,
             'first_name'        => explode(' ', $reservation->full_name, 2)[0] ?? $reservation->full_name,
@@ -112,9 +169,18 @@ class StudentController extends Controller
             'course'            => $reservation->course,
             'year_level'        => $reservation->year_level,
             'contact_number'    => $reservation->contact_number,
-            'boarding_house_id' => $data['boarding_house_id'] ?? $reservation->boarding_house_id,
+            'address'           => $reservation->address,
+            'boarding_house_id' => $boardingHouseId,
             'room_id'           => $data['room_id'] ?? null,
         ]);
+
+        if ($room) {
+            $studentCount = $room->students()->count();
+            $room->update([
+                'occupied_slots'  => $studentCount,
+                'available_slots' => max(0, $room->capacity - $studentCount),
+            ]);
+        }
 
         // Link reservation to student and mark converted
         $reservation->update(['student_id' => $student->id]);

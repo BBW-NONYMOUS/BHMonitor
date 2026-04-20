@@ -3,33 +3,108 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\StudentInquiry;
+use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
+use App\Models\Student;
+use App\Models\StudentBoardingHistory;
+use App\Models\StudentInquiry;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StudentInquiryController extends Controller
 {
+    private function syncApprovedReservation(StudentInquiry $inquiry, Request $request): void
+    {
+        if ($inquiry->status !== 'approved') {
+            return;
+        }
+
+        $student = $inquiry->student;
+
+        if (!$student && $inquiry->student_no) {
+            $student = Student::where('student_no', $inquiry->student_no)->first();
+        }
+
+        if (!$student) {
+            if (!$inquiry->student_no) {
+                return;
+            }
+
+            [$firstName, $lastName] = array_pad(explode(' ', trim($inquiry->full_name), 2), 2, '');
+
+            $student = Student::create([
+                'student_no'        => $inquiry->student_no,
+                'first_name'        => $firstName ?: $inquiry->full_name,
+                'last_name'         => $lastName,
+                'gender'            => $inquiry->gender,
+                'course'            => $inquiry->course,
+                'year_level'        => $inquiry->year_level,
+                'contact_number'    => $inquiry->contact_number,
+                'address'           => $inquiry->address,
+                'boarding_house_id' => $inquiry->boarding_house_id,
+            ]);
+
+            StudentBoardingHistory::create([
+                'student_id'        => $student->id,
+                'boarding_house_id' => $inquiry->boarding_house_id,
+                'boarded_at'        => now(),
+                'notes'             => 'Created automatically from approved reservation.',
+            ]);
+
+            ActivityLog::create([
+                'user_id'    => $request->user()->id,
+                'action'     => "Created student {$student->first_name} {$student->last_name} from approved reservation.",
+                'created_at' => now(),
+            ]);
+        } else {
+            $oldBoardingHouseId = $student->boarding_house_id;
+            $newBoardingHouseId = $inquiry->boarding_house_id;
+
+            if ((int) $oldBoardingHouseId !== (int) $newBoardingHouseId) {
+                if ($oldBoardingHouseId) {
+                    StudentBoardingHistory::where('student_id', $student->id)
+                        ->whereNull('vacated_at')
+                        ->update(['vacated_at' => now()]);
+                }
+
+                $student->update([
+                    'boarding_house_id' => $newBoardingHouseId,
+                    'room_id'           => null,
+                ]);
+
+                StudentBoardingHistory::create([
+                    'student_id'        => $student->id,
+                    'boarding_house_id' => $newBoardingHouseId,
+                    'boarded_at'        => now(),
+                    'notes'             => 'Assigned automatically from approved reservation.',
+                ]);
+            }
+        }
+
+        if ($inquiry->student_id !== $student->id) {
+            $inquiry->update(['student_id' => $student->id]);
+        }
+    }
+
     /**
      * Submit a reservation (auth required — auto-fills student info from account)
      */
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Please sign in before submitting a reservation.'], 401);
+        }
+        if (!$user->isStudent()) {
+            return response()->json(['message' => 'Only student accounts can submit reservations.'], 403);
+        }
+
         $validated = $request->validate([
             'boarding_house_id' => 'required|exists:boarding_houses,id',
             'move_in_date'      => 'nullable|date|after_or_equal:today',
             'year_level'        => 'nullable|string|max:20',
             'message'           => 'nullable|string|max:1000',
-            // For unauthenticated users (public fallback)
-            'full_name'         => 'nullable|string|max:255',
-            'email'             => 'nullable|email|max:255',
-            'contact_number'    => 'nullable|string|max:20',
-            'student_no'        => 'nullable|string|max:50',
-            'course'            => 'nullable|string|max:100',
-            'gender'            => 'nullable|in:Male,Female',
-            'address'           => 'nullable|string|max:500',
         ]);
 
         $bh = BoardingHouse::where('approval_status', 'approved')
@@ -37,7 +112,6 @@ class StudentInquiryController extends Controller
             ->findOrFail($validated['boarding_house_id']);
 
         // Auto-populate from authenticated student account
-        $user    = $request->user();
         $student = $user?->student;
 
         if ($student) {
@@ -105,7 +179,7 @@ class StudentInquiryController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $inquiry = StudentInquiry::with('boardingHouse')->findOrFail($id);
+        $inquiry = StudentInquiry::with(['boardingHouse', 'student'])->findOrFail($id);
         $user    = $request->user();
 
         if ($user->role !== 'admin' && (!$user->owner || $inquiry->boardingHouse->owner_id !== $user->owner->id)) {
@@ -118,10 +192,11 @@ class StudentInquiryController extends Controller
         ]);
 
         $inquiry->update($validated);
+        $this->syncApprovedReservation($inquiry->fresh(['boardingHouse', 'student']), $request);
 
         return response()->json([
             'message'     => 'Reservation updated successfully.',
-            'reservation' => $inquiry,
+            'reservation' => $inquiry->fresh(['boardingHouse', 'student']),
         ]);
     }
 
@@ -131,6 +206,10 @@ class StudentInquiryController extends Controller
     public function counts(Request $request): JsonResponse
     {
         $user  = $request->user();
+        if (!in_array($user->role, ['admin', 'owner'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $query = StudentInquiry::query();
 
         if ($user->role === 'owner' && $user->owner) {
@@ -152,6 +231,10 @@ class StudentInquiryController extends Controller
     public function allInquiries(Request $request): JsonResponse
     {
         $user  = $request->user();
+        if (!in_array($user->role, ['admin', 'owner'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $query = StudentInquiry::with('boardingHouse:id,boarding_name');
 
         if ($user->role === 'owner' && $user->owner) {
@@ -164,15 +247,51 @@ class StudentInquiryController extends Controller
     }
 
     /**
+     * Reservations for the authenticated student
+     */
+    public function myReservations(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isStudent()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $student = $user->student;
+        if (!$student) {
+            return response()->json([]);
+        }
+
+        $reservations = StudentInquiry::with([
+                'boardingHouse:id,boarding_name,address',
+                'student.room:id,room_name,boarding_house_id',
+            ])
+            ->where('student_id', $student->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json($reservations);
+    }
+
+    /**
      * Get approved reservations available for Direct Add to students
      */
     public function approvedForDirectAdd(Request $request): JsonResponse
     {
-        $reservations = StudentInquiry::with('boardingHouse:id,boarding_name')
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'owner'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $query = StudentInquiry::with('boardingHouse:id,boarding_name')
             ->where('status', 'approved')
-            ->whereNull('student_id') // not yet converted
-            ->orderByDesc('created_at')
-            ->get();
+            ->whereNull('student_id');
+
+        if ($user->role === 'owner' && $user->owner) {
+            $bhIds = $user->owner->boardingHouses()->pluck('id');
+            $query->whereIn('boarding_house_id', $bhIds);
+        }
+
+        $reservations = $query->orderByDesc('created_at')->get();
 
         return response()->json($reservations);
     }
