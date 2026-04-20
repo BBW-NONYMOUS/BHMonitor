@@ -27,7 +27,8 @@ export default function BoardingHouseFormPage() {
     const [selectedOwner, setSelectedOwner] = useState(null);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
-    const [showMap, setShowMap] = useState(false);
+    const [showMap, setShowMap] = useState(() => !id);
+    const hasPinnedLocation = Boolean(form.latitude && form.longitude);
 
     useEffect(() => {
         if (user?.role === 'admin') {
@@ -175,8 +176,33 @@ export default function BoardingHouseFormPage() {
                                         size="sm"
                                         onClick={() => setShowMap(!showMap)}
                                     >
-                                        {showMap ? 'Hide Map' : 'Pick on Map'}
+                                        {showMap ? 'Hide Map' : 'Show Pin Map'}
                                     </Button>
+                                </div>
+
+                                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="max-w-xl">
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                Pin the boarding house during registration
+                                            </p>
+                                            <p className="mt-1 text-sm text-slate-600">
+                                                This saved map pin will be shown to students so they can easily find the exact boarding house location.
+                                            </p>
+                                        </div>
+                                        <div className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                            hasPinnedLocation
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-amber-100 text-amber-700'
+                                        }`}>
+                                            {hasPinnedLocation ? 'Pin saved' : 'Pin not set'}
+                                        </div>
+                                    </div>
+                                    {hasPinnedLocation && (
+                                        <p className="mt-3 text-xs font-medium text-blue-700">
+                                            Saved coordinates: {form.latitude}, {form.longitude}
+                                        </p>
+                                    )}
                                 </div>
                                 
                                 {showMap && (

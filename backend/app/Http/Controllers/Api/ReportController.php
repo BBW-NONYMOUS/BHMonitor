@@ -51,9 +51,7 @@ class ReportController extends Controller
     public function geo(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = BoardingHouse::withCount('students')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude');
+        $query = BoardingHouse::withCount('students');
 
         if ($user->isOwner()) {
             $query->where('owner_id', $user->owner->id);

@@ -13,6 +13,7 @@ class MapController extends Controller
     {
         $user = $request->user();
         $query = BoardingHouse::with('owner')
+            ->withCount('students')
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->where('status', 'active');
@@ -22,16 +23,17 @@ class MapController extends Controller
         }
 
         $markers = $query->get()->map(fn ($bh) => [
-            'id'            => $bh->id,
-            'name'          => $bh->boarding_name,
-            'address'       => $bh->address,
-            'latitude'      => $bh->latitude,
-            'longitude'     => $bh->longitude,
-            'available'     => $bh->available_rooms,
-            'rate'          => $bh->room_rate,
-            'owner'         => $bh->owner?->full_name,
-            'owner_contact' => $bh->owner?->contact_number,
-            'owner_email'   => $bh->owner?->email,
+            'id'             => $bh->id,
+            'name'           => $bh->boarding_name,
+            'address'        => $bh->address,
+            'latitude'       => $bh->latitude,
+            'longitude'      => $bh->longitude,
+            'available'      => $bh->available_rooms,
+            'rate'           => $bh->room_rate,
+            'students_count' => $bh->students_count,
+            'owner'          => $bh->owner?->full_name,
+            'owner_contact'  => $bh->owner?->contact_number,
+            'owner_email'    => $bh->owner?->email,
         ]);
 
         return response()->json($markers);
@@ -39,19 +41,21 @@ class MapController extends Controller
 
     public function publicMarkers(): JsonResponse
     {
-        $markers = BoardingHouse::whereNotNull('latitude')
+        $markers = BoardingHouse::withCount('students')
+            ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->where('status', 'active')
             ->where('approval_status', 'approved')
             ->get()
             ->map(fn ($bh) => [
-                'id'        => $bh->id,
-                'name'      => $bh->boarding_name,
-                'address'   => $bh->address,
-                'latitude'  => $bh->latitude,
-                'longitude' => $bh->longitude,
-                'available' => $bh->available_rooms,
-                'rate'      => $bh->room_rate,
+                'id'             => $bh->id,
+                'name'           => $bh->boarding_name,
+                'address'        => $bh->address,
+                'latitude'       => $bh->latitude,
+                'longitude'      => $bh->longitude,
+                'available'      => $bh->available_rooms,
+                'rate'           => $bh->room_rate,
+                'students_count' => $bh->students_count,
             ]);
 
         return response()->json($markers);

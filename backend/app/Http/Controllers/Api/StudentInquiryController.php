@@ -192,7 +192,6 @@ class StudentInquiryController extends Controller
         ]);
 
         $inquiry->update($validated);
-        $this->syncApprovedReservation($inquiry->fresh(['boardingHouse', 'student']), $request);
 
         return response()->json([
             'message'     => 'Reservation updated successfully.',

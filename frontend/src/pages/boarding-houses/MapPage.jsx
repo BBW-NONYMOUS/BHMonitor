@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, MapPin, Filter, Maximize, Navigation, School, Phone, Mail, User, Layers } from 'lucide-react';
+import { ArrowLeft, MapPin, Filter, Maximize, Navigation, School, Phone, Mail, User, Layers, Users } from 'lucide-react';
 
 // Fix leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -274,6 +274,7 @@ export default function MapPage() {
         available: markers.filter(m => (m.available || 0) >= 5).length,
         limited: markers.filter(m => (m.available || 0) >= 1 && (m.available || 0) < 5).length,
         full: markers.filter(m => (m.available || 0) === 0).length,
+        totalStudents: markers.reduce((sum, m) => sum + (m.students_count || 0), 0),
     }), [markers]);
 
     return (
@@ -317,6 +318,10 @@ export default function MapPage() {
                 <div className="flex items-center gap-1">
                     <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                     <span className="text-slate-600">SKSU Campus</span>
+                </div>
+                <div className="flex items-center gap-1 ml-auto">
+                    <Users className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="text-blue-700 font-medium">{stats.totalStudents} student{stats.totalStudents !== 1 ? 's' : ''} located on map</span>
                 </div>
             </div>
 
@@ -435,6 +440,19 @@ export default function MapPage() {
                                             )}
                                         </div>
 
+                                        {/* Registered Students */}
+                                        <div className="flex items-center gap-2 py-2 px-3 bg-blue-50 rounded-lg mb-2">
+                                            <Users className="h-4 w-4 text-blue-600 shrink-0" />
+                                            <div>
+                                                <span className="text-sm font-semibold text-blue-700">
+                                                    {m.students_count ?? 0}
+                                                </span>
+                                                <span className="text-xs text-blue-600 ml-1">
+                                                    registered student{(m.students_count ?? 0) !== 1 ? 's' : ''} located here
+                                                </span>
+                                            </div>
+                                        </div>
+
                                         {/* Owner Info */}
                                         {m.owner && (
                                             <div className="border-t pt-2 mt-2">
@@ -510,7 +528,11 @@ export default function MapPage() {
                                         <span>{m.distance.toFixed(2)} km</span>
                                         {m.rate > 0 && <span className="text-emerald-600 font-medium">₱{Number(m.rate).toLocaleString()}/mo</span>}
                                     </div>
-                                    {m.owner && <p className="text-xs text-slate-400 mt-2">Owner: {m.owner}</p>}
+                                    <div className="flex items-center gap-1 mt-2 text-xs text-blue-600">
+                                        <Users className="h-3.5 w-3.5" />
+                                        <span>{m.students_count ?? 0} student{(m.students_count ?? 0) !== 1 ? 's' : ''} registered</span>
+                                    </div>
+                                    {m.owner && <p className="text-xs text-slate-400 mt-1">Owner: {m.owner}</p>}
                                 </div>
                             </Link>
                         ))}

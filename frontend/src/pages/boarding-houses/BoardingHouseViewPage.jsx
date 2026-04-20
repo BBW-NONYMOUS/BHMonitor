@@ -1,11 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import api from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Pencil, BedDouble, MapPin, MessageCircle } from 'lucide-react';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const bhPinIcon = L.divIcon({
+    className: 'bh-pin-icon',
+    html: `<div style="
+        background-color: #2563eb;
+        width: 32px;
+        height: 32px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 3px solid white;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    "></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -34],
+});
 
 function Field({ label, value }) {
     return (
@@ -71,10 +97,12 @@ export default function BoardingHouseViewPage() {
                             <Field label="Description" value={bh.description} />
                         </div>
                         {bh.latitude && bh.longitude && (
-                            <>
-                                <Field label="Latitude" value={bh.latitude} />
-                                <Field label="Longitude" value={bh.longitude} />
-                            </>
+                            <div className="sm:col-span-2 space-y-1">
+                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 flex items-center gap-1">
+                                    <MapPin className="h-3.5 w-3.5 text-blue-600" />Location Pin
+                                </p>
+                                <p className="text-xs text-slate-400 font-mono">{Number(bh.latitude).toFixed(6)}, {Number(bh.longitude).toFixed(6)}</p>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -109,6 +137,43 @@ export default function BoardingHouseViewPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {bh.latitude && bh.longitude && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <MapPin className="h-4 w-4 text-blue-600" />
+                            Location on Map
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0 overflow-hidden rounded-b-xl">
+                        <div style={{ height: '280px' }}>
+                            <MapContainer
+                                center={[parseFloat(bh.latitude), parseFloat(bh.longitude)]}
+                                zoom={16}
+                                style={{ height: '100%', width: '100%' }}
+                                scrollWheelZoom={false}
+                            >
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                />
+                                <Marker
+                                    position={[parseFloat(bh.latitude), parseFloat(bh.longitude)]}
+                                    icon={bhPinIcon}
+                                >
+                                    <Popup>
+                                        <div className="min-w-[150px]">
+                                            <p className="font-semibold text-sm">{bh.boarding_name}</p>
+                                            <p className="text-xs text-slate-500 mt-1">{bh.address}</p>
+                                        </div>
+                                    </Popup>
+                                </Marker>
+                            </MapContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {bh.students?.length > 0 && (
                 <Card>

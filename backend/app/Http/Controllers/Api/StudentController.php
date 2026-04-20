@@ -138,11 +138,6 @@ class StudentController extends Controller
             return response()->json(['message' => 'This reservation has already been converted to a student record.'], 422);
         }
 
-        // Check if student_no already exists
-        if (Student::where('student_no', $reservation->student_no)->exists()) {
-            return response()->json(['message' => 'A student with this student number already exists.'], 422);
-        }
-
         $boardingHouseId = $data['boarding_house_id'] ?? $reservation->boarding_house_id;
         $room = null;
         if (!empty($data['room_id'])) {
@@ -159,6 +154,24 @@ class StudentController extends Controller
                     'room_id' => ['The selected room is already at full capacity.'],
                 ]);
             }
+        }
+
+        // If a student with this student_no already exists, link the reservation to them
+        $existingStudent = $reservation->student_no
+            ? Student::where('student_no', $reservation->student_no)->first()
+            : null;
+
+        if ($existingStudent) {
+            if ($room) {
+                $existingStudent->update(['room_id' => $room->id, 'boarding_house_id' => $boardingHouseId]);
+                $studentCount = $room->students()->count();
+                $room->update([
+                    'occupied_slots'  => $studentCount,
+                    'available_slots' => max(0, $room->capacity - $studentCount),
+                ]);
+            }
+            $reservation->update(['student_id' => $existingStudent->id]);
+            return response()->json($existingStudent->load('boardingHouse', 'room'), 200);
         }
 
         $student = Student::create([

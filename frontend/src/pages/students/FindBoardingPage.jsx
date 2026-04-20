@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '@/services/api';
@@ -84,6 +84,37 @@ const campusIcon = L.divIcon({
     popupAnchor: [0, -20],
 });
 
+const studentLocationIcon = L.divIcon({
+    className: 'student-location-marker',
+    html: `<div style="
+        position: relative;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            position: absolute;
+            inset: 0;
+            border-radius: 9999px;
+            background: rgba(37, 99, 235, 0.22);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+        "></div>
+        <div style="
+            width: 10px;
+            height: 10px;
+            border-radius: 9999px;
+            background: #2563eb;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        "></div>
+    </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -14],
+});
+
 const getMarkerIcon = (available) => {
     if (available === null || available === undefined) return createCustomIcon('#9ca3af', 0);
     if (available >= 5) return createCustomIcon('#22c55e', available);
@@ -110,6 +141,39 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
+const formatDistanceLabel = (distance, hasStudentLocation) =>
+    `${distance.toFixed(2)} km ${hasStudentLocation ? 'from your location' : 'from SKSU campus'}`;
+
+function MapViewport({ markers, coords }) {
+    const map = useMap();
+
+    useEffect(() => {
+        const points = [L.latLng(SKSU_KALAMANSIG[0], SKSU_KALAMANSIG[1])];
+
+        if (coords) {
+            points.push(L.latLng(coords.lat, coords.lng));
+        }
+
+        markers.forEach((marker) => {
+            if (Number.isFinite(marker.latitude) && Number.isFinite(marker.longitude)) {
+                points.push(L.latLng(marker.latitude, marker.longitude));
+            }
+        });
+
+        if (points.length === 1) {
+            map.setView(points[0], 15);
+            return;
+        }
+
+        map.fitBounds(L.latLngBounds(points), {
+            padding: [36, 36],
+            maxZoom: coords ? 16 : 15,
+        });
+    }, [map, markers, coords]);
+
+    return null;
+}
+
 export default function FindBoardingPage() {
     const [results, setResults] = useState([]);
     const [mapMarkers, setMapMarkers] = useState([]);
@@ -120,6 +184,7 @@ export default function FindBoardingPage() {
     const [filters, setFilters] = useState({
         search: '', max_price: '', gender_type: '', sort: 'latest',
     });
+    const hasStudentLocation = Boolean(coords);
 
     const fetchResults = async () => {
         setLoading(true);
@@ -150,11 +215,32 @@ export default function FindBoardingPage() {
 
     // Add distance to markers and apply availability filter
     const markersWithDistance = useMemo(() => {
-        let markers = mapMarkers.map(m => ({
-            ...m,
-            distance: calculateDistance(SKSU_KALAMANSIG[0], SKSU_KALAMANSIG[1], m.latitude, m.longitude),
-            availability_status: computeAvailabilityStatus(m.available)
-        })).sort((a, b) => a.distance - b.distance);
+        let markers = mapMarkers
+            .filter(m => Number.isFinite(Number(m.latitude)) && Number.isFinite(Number(m.longitude)))
+            .map(m => {
+                const latitude = Number(m.latitude);
+                const longitude = Number(m.longitude);
+                const distanceFromCampus = calculateDistance(
+                    SKSU_KALAMANSIG[0],
+                    SKSU_KALAMANSIG[1],
+                    latitude,
+                    longitude
+                );
+                const distanceFromStudent = coords
+                    ? calculateDistance(coords.lat, coords.lng, latitude, longitude)
+                    : null;
+
+                return {
+                    ...m,
+                    latitude,
+                    longitude,
+                    distance: distanceFromStudent ?? distanceFromCampus,
+                    distanceFromCampus,
+                    distanceFromStudent,
+                    availability_status: computeAvailabilityStatus(m.available)
+                };
+            })
+            .sort((a, b) => a.distance - b.distance);
 
         // Apply availability filter if any filters are selected
         if (availabilityFilter.length > 0) {
@@ -162,7 +248,7 @@ export default function FindBoardingPage() {
         }
 
         return markers;
-    }, [mapMarkers, availabilityFilter]);
+    }, [mapMarkers, availabilityFilter, coords]);
 
     const getLocation = () => {
         navigator.geolocation?.getCurrentPosition(pos => {
@@ -331,8 +417,46 @@ export default function FindBoardingPage() {
                 {/* Map View */}
                 {viewMode === 'map' && (
                     <div className="mb-6">
+                        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                            <div className="flex items-center gap-2 font-medium">
+                                <MapPin className="h-4 w-4" />
+                                Registered boarding houses are pinned on this map.
+                            </div>
+                            <div className="text-blue-800/80">
+                                {hasStudentLocation
+                                    ? 'Distances are based on your current location.'
+                                    : 'Turn on your location to compare boarding houses from where you are.'}
+                            </div>
+                            {hasStudentLocation && (
+                                <div className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700">
+                                    {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                                </div>
+                            )}
+                            <div className="ml-auto flex items-center gap-2">
+                                <Button
+                                    variant={hasStudentLocation ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={getLocation}
+                                    className={hasStudentLocation ? 'bg-blue-600 hover:bg-blue-700' : 'border-blue-300 text-blue-700 hover:bg-blue-100'}
+                                >
+                                    <Navigation className="mr-1 h-4 w-4" />
+                                    {hasStudentLocation ? 'Refresh my location' : 'Use my location'}
+                                </Button>
+                                {hasStudentLocation && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setCoords(null)}
+                                        className="text-blue-700 hover:bg-blue-100"
+                                    >
+                                        Clear
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm" style={{ height: '500px' }}>
                             <MapContainer center={SKSU_KALAMANSIG} zoom={15} style={{ height: '100%', width: '100%' }}>
+                                <MapViewport markers={markersWithDistance} coords={coords} />
                                 {/* Satellite view by default - ESRI World Imagery - REQ-015 */}
                                 <TileLayer
                                     attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
@@ -363,6 +487,27 @@ export default function FindBoardingPage() {
                                     pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1 }}
                                 />
 
+                                {hasStudentLocation && (
+                                    <>
+                                        <Circle
+                                            center={[coords.lat, coords.lng]}
+                                            radius={180}
+                                            pathOptions={{ color: '#2563eb', fillColor: '#60a5fa', fillOpacity: 0.14, weight: 1.5 }}
+                                        />
+                                        <Marker position={[coords.lat, coords.lng]} icon={studentLocationIcon}>
+                                            <Popup>
+                                                <div className="text-center p-2">
+                                                    <Navigation className="mx-auto mb-2 h-5 w-5 text-blue-600" />
+                                                    <p className="font-bold text-slate-900">Your current location</p>
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        Boarding houses are sorted by distance from this point.
+                                                    </p>
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    </>
+                                )}
+
                                 {/* Boarding House Markers */}
                                 {markersWithDistance.map(m => (
                                     <Marker key={m.id} position={[m.latitude, m.longitude]} icon={getMarkerIcon(m.available)}>
@@ -386,7 +531,7 @@ export default function FindBoardingPage() {
                                                 <div className="flex items-center gap-3 text-xs text-slate-600 mb-2">
                                                     <span className="flex items-center gap-1">
                                                         <MapPin className="h-3 w-3" />
-                                                        {m.distance.toFixed(2)} km
+                                                        {formatDistanceLabel(m.distance, hasStudentLocation)}
                                                     </span>
                                                     {m.rate > 0 && (
                                                         <span className="font-medium text-emerald-600">
@@ -394,6 +539,12 @@ export default function FindBoardingPage() {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {hasStudentLocation && (
+                                                    <p className="mb-2 text-xs text-slate-500">
+                                                        {m.distanceFromCampus.toFixed(2)} km from SKSU campus
+                                                    </p>
+                                                )}
 
                                                 <a 
                                                     href={`/find-boarding/${m.id}`}
@@ -408,8 +559,9 @@ export default function FindBoardingPage() {
                             </MapContainer>
                         </div>
                         <p className="text-xs text-slate-500 mt-2 text-center">
-                            Showing {markersWithDistance.length} boarding houses near SKSU Kalamansig Campus. 
-                            Blue circle indicates 1km radius from campus.
+                            Showing {markersWithDistance.length} registered boarding houses near SKSU Kalamansig Campus.
+                            {' '}The large blue circle indicates 1km from campus.
+                            {hasStudentLocation && ' The smaller blue circle marks your current location.'}
                         </p>
                     </div>
                 )}
