@@ -167,7 +167,10 @@ class StudentInquiryController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $reservations = StudentInquiry::where('boarding_house_id', $boardingHouseId)
+        $reservations = StudentInquiry::with([
+                'student:id,boarding_house_id,room_id',
+            ])
+            ->where('boarding_house_id', $boardingHouseId)
             ->orderByDesc('created_at')
             ->get();
 
@@ -179,7 +182,10 @@ class StudentInquiryController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $inquiry = StudentInquiry::with(['boardingHouse', 'student'])->findOrFail($id);
+        $inquiry = StudentInquiry::with([
+            'boardingHouse',
+            'student:id,boarding_house_id,room_id',
+        ])->findOrFail($id);
         $user    = $request->user();
 
         if ($user->role !== 'admin' && (!$user->owner || $inquiry->boardingHouse->owner_id !== $user->owner->id)) {
@@ -192,10 +198,18 @@ class StudentInquiryController extends Controller
         ]);
 
         $inquiry->update($validated);
+        $inquiry->refresh();
+
+        if (isset($validated['status'])) {
+            $this->syncApprovedReservation($inquiry, $request);
+        }
 
         return response()->json([
             'message'     => 'Reservation updated successfully.',
-            'reservation' => $inquiry->fresh(['boardingHouse', 'student']),
+            'reservation' => $inquiry->fresh([
+                'boardingHouse',
+                'student:id,boarding_house_id,room_id',
+            ]),
         ]);
     }
 
@@ -234,7 +248,10 @@ class StudentInquiryController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $query = StudentInquiry::with('boardingHouse:id,boarding_name');
+        $query = StudentInquiry::with([
+            'boardingHouse:id,boarding_name',
+            'student:id,boarding_house_id,room_id',
+        ]);
 
         if ($user->role === 'owner' && $user->owner) {
             $bhIds = $user->owner->boardingHouses()->pluck('id');

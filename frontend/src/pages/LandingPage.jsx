@@ -333,14 +333,14 @@ export default function LandingPage() {
                                     <Building2 className="h-28 w-28 text-white/80 sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
                                 </div>
                                 {/* Floating badge */}
-                                <div className="absolute -bottom-4 -left-4 flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 shadow-lg">
+                                {/* <div className="absolute -bottom-4 -left-4 flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 shadow-lg">
                                     <Users className="h-4 w-4 text-blue-600" />
                                     <span className="text-xs font-semibold text-slate-800">2,000+ Students</span>
                                 </div>
                                 <div className="absolute -right-4 -top-4 flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 shadow-lg">
                                     <Star className="h-4 w-4 text-amber-500" />
                                     <span className="text-xs font-semibold text-slate-800">Top Rated</span>
-                                </div>
+                                </div> */}
                             </div>
                         </div>
                     </div>

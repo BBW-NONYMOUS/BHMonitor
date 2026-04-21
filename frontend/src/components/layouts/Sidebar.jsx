@@ -17,7 +17,7 @@ const navItems = [
     { to: '/students',          label: 'Students',        icon: Users,           roles: ['admin', 'owner'] },
     { to: '/boarding-houses',   label: 'Boarding Houses', icon: Building2,       roles: ['admin', 'owner'] },
     { to: '/boarding-houses/map', label: 'Map View',      icon: Map,             roles: ['admin', 'owner'] },
-    { to: '/reservations',      label: 'Reservations',    icon: BookOpen,        roles: ['admin', 'owner'], showBadge: true },
+    { to: '/reservations',      label: 'Reservations',    icon: BookOpen,        roles: ['owner'], showBadge: true },
     { to: '/owners',            label: 'Owners',          icon: UserCog,         roles: ['admin'] },
     { to: '/accounts',          label: 'Accounts',        icon: ShieldCheck,     roles: ['admin'], showAccountBadge: true },
     {

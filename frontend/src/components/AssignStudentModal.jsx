@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -15,7 +16,9 @@ const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
 const GENDER_OPTIONS = ['Male', 'Female'];
 
 export default function AssignStudentModal({ open, onClose, room, boardingHouses = [] }) {
-    const [activeTab, setActiveTab] = useState('reservations');
+    const { user } = useAuth();
+    const isOwner = user?.role === 'owner';
+    const [activeTab, setActiveTab] = useState(isOwner ? 'reservations' : 'manual');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     
@@ -103,17 +106,19 @@ export default function AssignStudentModal({ open, onClose, room, boardingHouses
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="reservations">
-                            From Reservations
-                        </TabsTrigger>
+                    <TabsList className={`grid w-full ${isOwner ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {isOwner && (
+                            <TabsTrigger value="reservations">
+                                From Reservations
+                            </TabsTrigger>
+                        )}
                         <TabsTrigger value="manual">
                             Manual Entry
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* Reservations Tab */}
-                    <TabsContent value="reservations" className="space-y-4">
+                    {/* Reservations Tab — owner only */}
+                    {isOwner && <TabsContent value="reservations" className="space-y-4">
                         {loading ? (
                             <div className="flex justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
@@ -157,7 +162,7 @@ export default function AssignStudentModal({ open, onClose, room, boardingHouses
                                 ))}
                             </div>
                         )}
-                    </TabsContent>
+                    </TabsContent>}
 
                     {/* Manual Entry Tab */}
                     <TabsContent value="manual" className="space-y-4">

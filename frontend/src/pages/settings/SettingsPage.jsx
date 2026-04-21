@@ -292,13 +292,6 @@ export default function SettingsPage() {
                     <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                         <div className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                Profile completion
-                            </p>
-                            <p className="mt-2 text-3xl font-semibold text-slate-950">{completion}%</p>
-                            <Progress value={completion} className="mt-4" />
-                        </div>
-                        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 Contact email
                             </p>
                             <p className="mt-2 truncate text-sm font-medium text-slate-900">{form.email}</p>
@@ -526,14 +519,6 @@ export default function SettingsPage() {
                             </div>
 
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-2xl border border-slate-200 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                        Best for
-                                    </p>
-                                    <p className="mt-2 text-sm text-slate-700">
-                                        Sidebar identity, internal account views, and quicker staff recognition.
-                                    </p>
-                                </div>
                                 <div className="rounded-2xl border border-slate-200 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                         Current role

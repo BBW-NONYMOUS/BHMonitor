@@ -128,14 +128,23 @@ class StudentController extends Controller
             'room_id'           => 'nullable|exists:rooms,id',
         ]);
 
-        $reservation = StudentInquiry::findOrFail($data['reservation_id']);
+        $reservation = StudentInquiry::with(['boardingHouse', 'student'])->findOrFail($data['reservation_id']);
 
-        if ($reservation->status !== 'approved') {
-            return response()->json(['message' => 'Only approved reservations can be converted to student records.'], 422);
+        // Authorization: owner can only assign students from their own boarding houses
+        $user = $request->user();
+        if ($user->role === 'owner') {
+            if (!$user->owner || !$user->owner->boardingHouses()->where('id', $reservation->boarding_house_id)->exists()) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
         }
 
-        if ($reservation->student_id) {
-            return response()->json(['message' => 'This reservation has already been converted to a student record.'], 422);
+        if (in_array($reservation->status, ['declined', 'cancelled'])) {
+            return response()->json(['message' => 'Cannot assign a declined or cancelled reservation.'], 422);
+        }
+
+        // Auto-approve the reservation when owner assigns
+        if ($reservation->status !== 'approved') {
+            $reservation->update(['status' => 'approved']);
         }
 
         $boardingHouseId = $data['boarding_house_id'] ?? $reservation->boarding_house_id;
@@ -157,20 +166,51 @@ class StudentController extends Controller
         }
 
         // If a student with this student_no already exists, link the reservation to them
-        $existingStudent = $reservation->student_no
-            ? Student::where('student_no', $reservation->student_no)->first()
-            : null;
+        $existingStudent = $reservation->student;
+
+        if (!$existingStudent && $reservation->student_no) {
+            $existingStudent = Student::where('student_no', $reservation->student_no)->first();
+        }
 
         if ($existingStudent) {
+            $oldBoardingHouseId = $existingStudent->boarding_house_id;
+            $updates = ['boarding_house_id' => $boardingHouseId];
+
             if ($room) {
-                $existingStudent->update(['room_id' => $room->id, 'boarding_house_id' => $boardingHouseId]);
+                $updates['room_id'] = $room->id;
+            } elseif ((int) $oldBoardingHouseId !== (int) $boardingHouseId) {
+                $updates['room_id'] = null;
+            }
+
+            $existingStudent->update($updates);
+
+            if ((int) $oldBoardingHouseId !== (int) $boardingHouseId) {
+                if ($oldBoardingHouseId) {
+                    StudentBoardingHistory::where('student_id', $existingStudent->id)
+                        ->whereNull('vacated_at')
+                        ->update(['vacated_at' => now()]);
+                }
+
+                StudentBoardingHistory::create([
+                    'student_id'        => $existingStudent->id,
+                    'boarding_house_id' => $boardingHouseId,
+                    'boarded_at'        => now(),
+                    'notes'             => 'Assigned from reservation.',
+                ]);
+            }
+
+            if ($room) {
                 $studentCount = $room->students()->count();
                 $room->update([
                     'occupied_slots'  => $studentCount,
                     'available_slots' => max(0, $room->capacity - $studentCount),
                 ]);
             }
-            $reservation->update(['student_id' => $existingStudent->id]);
+
+            if ((int) $reservation->student_id !== (int) $existingStudent->id) {
+                $reservation->update(['student_id' => $existingStudent->id]);
+            }
+
             return response()->json($existingStudent->load('boardingHouse', 'room'), 200);
         }
 

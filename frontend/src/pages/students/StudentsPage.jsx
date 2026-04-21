@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { ChevronDown, Search, Eye, Pencil, Trash2, UserCheck, UserPlus, Clipboar
 
 export default function StudentsPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [students, setStudents] = useState([]);
     const [meta, setMeta] = useState({});
     const [loading, setLoading] = useState(true);
@@ -64,10 +66,12 @@ export default function StudentsPage() {
                             <ClipboardList className="mr-2 h-4 w-4" />
                             Manual Add
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate('/students/direct-add')}>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Direct Add from Reservation
-                        </DropdownMenuItem>
+                        {user?.role === 'owner' && (
+                            <DropdownMenuItem onClick={() => navigate('/students/direct-add')}>
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Direct Add from Reservation
+                            </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

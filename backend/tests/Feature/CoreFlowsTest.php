@@ -278,6 +278,95 @@ class CoreFlowsTest extends TestCase
             ]);
     }
 
+    public function test_owner_can_assign_existing_student_from_pending_reservation(): void
+    {
+        $ownerUser = User::create([
+            'name' => 'owner1',
+            'email' => 'owner@example.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'owner',
+            'account_status' => 'approved',
+        ]);
+
+        $owner = Owner::create([
+            'user_id' => $ownerUser->id,
+            'full_name' => 'Owner One',
+            'email' => 'owner@example.com',
+        ]);
+
+        $studentUser = User::create([
+            'name' => 'Ivy Santos',
+            'email' => 'ivy@example.com',
+            'password' => Hash::make('secret123'),
+            'role' => 'student',
+            'account_status' => 'approved',
+        ]);
+
+        $student = Student::create([
+            'user_id' => $studentUser->id,
+            'student_no' => '2026-0001',
+            'first_name' => 'Ivy',
+            'last_name' => 'Santos',
+            'contact_number' => '09171234567',
+            'course' => 'BSIT',
+            'year_level' => '2nd Year',
+            'address' => 'Purok 1, Kalamansig',
+        ]);
+
+        $boardingHouse = BoardingHouse::create([
+            'owner_id' => $owner->id,
+            'boarding_name' => 'Blue House',
+            'address' => 'Campus Road',
+            'status' => 'active',
+            'approval_status' => 'approved',
+        ]);
+
+        $room = Room::create([
+            'boarding_house_id' => $boardingHouse->id,
+            'room_name' => 'Room 101',
+            'capacity' => 4,
+            'available_slots' => 4,
+            'occupied_slots' => 0,
+            'price' => 3500,
+            'status' => 'available',
+        ]);
+
+        $reservation = StudentInquiry::create([
+            'boarding_house_id' => $boardingHouse->id,
+            'student_id' => $student->id,
+            'full_name' => 'Ivy Santos',
+            'email' => 'ivy@example.com',
+            'contact_number' => '09171234567',
+            'address' => 'Purok 1, Kalamansig',
+            'student_no' => '2026-0001',
+            'course' => 'BSIT',
+            'year_level' => '2nd Year',
+            'status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($ownerUser);
+
+        $this->postJson('/api/students/from-reservation', [
+            'reservation_id' => $reservation->id,
+            'room_id' => $room->id,
+        ])->assertOk()
+            ->assertJsonPath('id', $student->id)
+            ->assertJsonPath('boarding_house_id', $boardingHouse->id)
+            ->assertJsonPath('room_id', $room->id);
+
+        $this->assertDatabaseHas('student_inquiries', [
+            'id' => $reservation->id,
+            'student_id' => $student->id,
+            'status' => 'approved',
+        ]);
+
+        $this->assertDatabaseHas('students', [
+            'id' => $student->id,
+            'boarding_house_id' => $boardingHouse->id,
+            'room_id' => $room->id,
+        ]);
+    }
+
     public function test_student_can_view_their_own_reservations(): void
     {
         $studentUser = User::create([

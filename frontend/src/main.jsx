@@ -75,6 +75,13 @@ function AdminOwnerRoute({ children }) {
     return children;
 }
 
+function OwnerRoute({ children }) {
+    const { user } = useAuth();
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== 'owner') return <Navigate to="/dashboard" replace />;
+    return children;
+}
+
 function SmartRedirect() {
     const { user } = useAuth();
     if (user?.role === 'student') return <Navigate to="/student-dashboard" replace />;
@@ -106,7 +113,7 @@ function App() {
                     {/* Students */}
                     <Route path="students" element={<StudentsPage />} />
                     <Route path="students/create" element={<StudentFormPage />} />
-                    <Route path="students/direct-add" element={<DirectAddPage />} />
+                    <Route path="students/direct-add" element={<OwnerRoute><DirectAddPage /></OwnerRoute>} />
                     <Route path="students/:id/edit" element={<StudentFormPage />} />
                     <Route path="students/:id" element={<StudentViewPage />} />
                     <Route path="students/:id/assign" element={<AssignBoardingPage />} />
@@ -117,13 +124,13 @@ function App() {
                     <Route path="boarding-houses/:id/edit" element={<BoardingHouseFormPage />} />
                     <Route path="boarding-houses/:id" element={<BoardingHouseViewPage />} />
                     <Route path="boarding-houses/:id/rooms" element={<RoomsPage />} />
-                    <Route path="boarding-houses/:id/inquiries" element={<InquiriesPage />} />
+                    <Route path="boarding-houses/:id/inquiries" element={<OwnerRoute><InquiriesPage /></OwnerRoute>} />
                     <Route path="boarding-houses/map" element={<MapPage />} />
 
-                    {/* Reservations (all) — legacy alias kept */}
-                    <Route path="inquiries" element={<AllInquiriesPage />} />
-                    <Route path="reservations" element={<AllInquiriesPage />} />
-                    <Route path="boarding-houses/:id/reservations" element={<InquiriesPage />} />
+                    {/* Reservations — owner only */}
+                    <Route path="inquiries" element={<OwnerRoute><AllInquiriesPage /></OwnerRoute>} />
+                    <Route path="reservations" element={<OwnerRoute><AllInquiriesPage /></OwnerRoute>} />
+                    <Route path="boarding-houses/:id/reservations" element={<OwnerRoute><InquiriesPage /></OwnerRoute>} />
 
                     {/* Owners — admin only */}
                     <Route path="owners" element={<AdminRoute><OwnersPage /></AdminRoute>} />
