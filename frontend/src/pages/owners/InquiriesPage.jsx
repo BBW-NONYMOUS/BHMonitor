@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import {
     BookOpen, Mail, Phone, Clock, CheckCircle, XCircle,
     AlertCircle, RefreshCw, MessageCircle, MapPin,
-    UserPlus, Loader2, Users, CalendarDays, Eye
+    Loader2, Users, CalendarDays, Eye
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -56,6 +55,7 @@ function isReservationAssigned(reservation) {
 
 export default function ReservationsPage() {
     const { id: boardingHouseId } = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
@@ -64,14 +64,18 @@ export default function ReservationsPage() {
     // Student profile modal
     const [profileTarget, setProfileTarget] = useState(null);
 
-    // Assign dialog
-    const [assignTarget, setAssignTarget] = useState(null);
-    const [rooms, setRooms] = useState([]);
-    const [roomId, setRoomId] = useState('');
-    const [accepting, setAccepting] = useState(false);
-    const [loadingRooms, setLoadingRooms] = useState(false);
-
     useEffect(() => { fetchReservations(); }, [boardingHouseId]);
+
+    // Auto-open student modal when navigated from a notification (?inquiry=<id>)
+    useEffect(() => {
+        const inquiryId = searchParams.get('inquiry');
+        if (!inquiryId || reservations.length === 0) return;
+        const target = reservations.find((r) => String(r.id) === inquiryId);
+        if (target) {
+            setProfileTarget(target);
+            setSearchParams({}, { replace: true });
+        }
+    }, [reservations, searchParams]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -99,38 +103,6 @@ export default function ReservationsPage() {
             toast.error(err.response?.data?.message || 'Failed to update status.');
         } finally {
             setUpdating(null);
-        }
-    };
-
-    const openAssign = async (reservation) => {
-        setAssignTarget(reservation);
-        setRoomId('');
-        setLoadingRooms(true);
-        try {
-            const { data } = await api.get(`/boarding-houses/${boardingHouseId}/rooms`);
-            setRooms(data.filter(r => r.computed_status !== 'full'));
-        } catch {
-            setRooms([]);
-        } finally {
-            setLoadingRooms(false);
-        }
-    };
-
-    const handleAssign = async () => {
-        if (!assignTarget) return;
-        setAccepting(true);
-        try {
-            await api.post('/students/from-reservation', {
-                reservation_id: assignTarget.id,
-                ...(roomId && roomId !== 'none' ? { room_id: roomId } : {}),
-            });
-            toast.success(`${assignTarget.full_name} has been assigned as a student.`);
-            setAssignTarget(null);
-            fetchReservations();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to assign student.');
-        } finally {
-            setAccepting(false);
         }
     };
 
@@ -367,14 +339,7 @@ export default function ReservationsPage() {
                                                     ) : ['declined', 'cancelled'].includes(reservation.status) ? (
                                                         <span className="text-xs text-slate-300">—</span>
                                                     ) : (
-                                                        <Button
-                                                            size="sm"
-                                                            className="gap-1 bg-green-600 hover:bg-green-700 text-white h-8"
-                                                            onClick={() => openAssign(reservation)}
-                                                        >
-                                                            <UserPlus className="h-3.5 w-3.5" />
-                                                            Assign
-                                                        </Button>
+                                                        <span className="text-xs text-slate-300">â€”</span>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
@@ -475,14 +440,6 @@ export default function ReservationsPage() {
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setProfileTarget(null)}>Close</Button>
-                        {profileTarget && !isReservationAssigned(profileTarget) && !['declined','cancelled'].includes(profileTarget.status) && (
-                            <Button
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => { setProfileTarget(null); openAssign(profileTarget); }}
-                            >
-                                <UserPlus className="mr-2 h-4 w-4" /> Assign Student
-                            </Button>
-                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

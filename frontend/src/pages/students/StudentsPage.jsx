@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -9,12 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Search, Eye, Pencil, Trash2, UserCheck, UserPlus, ClipboardList, FileCheck, FilePlus } from 'lucide-react';
+import { Search, Eye, Pencil, Trash2, UserCheck, UserPlus, FileCheck, FilePlus } from 'lucide-react';
 
 export default function StudentsPage() {
     const navigate = useNavigate();
-    const { user } = useAuth();
     const [students, setStudents] = useState([]);
     const [meta, setMeta] = useState({});
     const [loading, setLoading] = useState(true);
@@ -53,27 +50,10 @@ export default function StudentsPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Students</h1>
                     <p className="text-sm text-slate-500">Manage student records and boarding assignments.</p>
                 </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button className="w-full sm:w-auto">
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Add Student
-                            <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate('/students/create')}>
-                            <ClipboardList className="mr-2 h-4 w-4" />
-                            Manual Add
-                        </DropdownMenuItem>
-                        {user?.role === 'owner' && (
-                            <DropdownMenuItem onClick={() => navigate('/students/direct-add')}>
-                                <UserPlus className="mr-2 h-4 w-4" />
-                                Direct Add from Reservation
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <Button className="w-full sm:w-auto" onClick={() => navigate('/students/create')}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add Student
+                </Button>
             </div>
 
             <Card>

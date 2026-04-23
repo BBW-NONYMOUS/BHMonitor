@@ -17,7 +17,6 @@ import StudentDocumentsPage from '@/pages/students/StudentDocumentsPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import StudentsPage from '@/pages/students/StudentsPage';
 import StudentFormPage from '@/pages/students/StudentFormPage';
-import DirectAddPage from '@/pages/students/DirectAddPage';
 import StudentViewPage from '@/pages/students/StudentViewPage';
 import AssignBoardingPage from '@/pages/students/AssignBoardingPage';
 import FindBoardingPage from '@/pages/students/FindBoardingPage';
@@ -113,7 +112,6 @@ function App() {
                     {/* Students */}
                     <Route path="students" element={<StudentsPage />} />
                     <Route path="students/create" element={<StudentFormPage />} />
-                    <Route path="students/direct-add" element={<OwnerRoute><DirectAddPage /></OwnerRoute>} />
                     <Route path="students/:id/edit" element={<StudentFormPage />} />
                     <Route path="students/:id" element={<StudentViewPage />} />
                     <Route path="students/:id/assign" element={<AssignBoardingPage />} />
@@ -124,13 +122,13 @@ function App() {
                     <Route path="boarding-houses/:id/edit" element={<BoardingHouseFormPage />} />
                     <Route path="boarding-houses/:id" element={<BoardingHouseViewPage />} />
                     <Route path="boarding-houses/:id/rooms" element={<RoomsPage />} />
-                    <Route path="boarding-houses/:id/inquiries" element={<OwnerRoute><InquiriesPage /></OwnerRoute>} />
+                    <Route path="boarding-houses/:id/inquiries" element={<AdminOwnerRoute><InquiriesPage /></AdminOwnerRoute>} />
                     <Route path="boarding-houses/map" element={<MapPage />} />
 
-                    {/* Reservations — owner only */}
-                    <Route path="inquiries" element={<OwnerRoute><AllInquiriesPage /></OwnerRoute>} />
-                    <Route path="reservations" element={<OwnerRoute><AllInquiriesPage /></OwnerRoute>} />
-                    <Route path="boarding-houses/:id/reservations" element={<OwnerRoute><InquiriesPage /></OwnerRoute>} />
+                    {/* Reservations — admin and owner */}
+                    <Route path="inquiries" element={<AdminOwnerRoute><AllInquiriesPage /></AdminOwnerRoute>} />
+                    <Route path="reservations" element={<AdminOwnerRoute><AllInquiriesPage /></AdminOwnerRoute>} />
+                    <Route path="boarding-houses/:id/reservations" element={<AdminOwnerRoute><InquiriesPage /></AdminOwnerRoute>} />
 
                     {/* Owners — admin only */}
                     <Route path="owners" element={<AdminRoute><OwnersPage /></AdminRoute>} />

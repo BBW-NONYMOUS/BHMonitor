@@ -6,14 +6,22 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen, Calendar, CheckCircle, Clock, Home, MapPin, Search, XCircle } from 'lucide-react';
+import { BookOpen, Calendar, CheckCircle, Clock, Home, MapPin, MessageSquare, Search, XCircle } from 'lucide-react';
 
 const STATUS_META = {
-    pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-    contacted: { label: 'Contacted', className: 'bg-blue-50 text-blue-700 border-blue-200', icon: Clock },
-    approved: { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle },
-    declined: { label: 'Declined', className: 'bg-red-50 text-red-700 border-red-200', icon: XCircle },
-    cancelled: { label: 'Cancelled', className: 'bg-slate-50 text-slate-700 border-slate-200', icon: XCircle },
+    pending:   { label: 'Pending',   className: 'bg-amber-50 text-amber-700 border-amber-200',   icon: Clock },
+    contacted: { label: 'Contacted', className: 'bg-blue-50 text-blue-700 border-blue-200',       icon: MessageSquare },
+    approved:  { label: 'Approved',  className: 'bg-green-50 text-green-700 border-green-200',    icon: CheckCircle },
+    declined:  { label: 'Declined',  className: 'bg-red-50 text-red-700 border-red-200',          icon: XCircle },
+    cancelled: { label: 'Cancelled', className: 'bg-slate-50 text-slate-700 border-slate-200',    icon: XCircle },
+};
+
+const STATUS_NOTE = {
+    pending:   'Waiting for the owner to review your reservation.',
+    contacted: 'The owner has responded — check their notes below.',
+    approved:  'Your reservation is approved. The owner will assign you a room.',
+    declined:  'This reservation was declined.',
+    cancelled: 'This reservation was cancelled.',
 };
 
 export default function StudentReservationsPage() {
@@ -112,12 +120,9 @@ export default function StudentReservationsPage() {
                                         <div className="rounded-lg border bg-slate-50 p-3">
                                             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Assignment Status</p>
                                             <div className="mt-2 space-y-1.5">
-                                                <p>Boarding House: {reservation.status === 'approved' ? 'Approved' : 'Waiting for owner approval'}</p>
                                                 <p>Room: {assignedRoom?.room_name || 'Not assigned yet'}</p>
-                                                <p>
-                                                    Status Note: {reservation.status === 'approved'
-                                                        ? 'You can now be assigned to a room by the owner.'
-                                                        : 'The owner still needs to review this reservation.'}
+                                                <p className="text-slate-500 text-xs">
+                                                    {STATUS_NOTE[reservation.status] || STATUS_NOTE.pending}
                                                 </p>
                                             </div>
                                         </div>
@@ -127,6 +132,16 @@ export default function StudentReservationsPage() {
                                         <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-slate-700">
                                             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-blue-600">Your Message</p>
                                             <p>{reservation.message}</p>
+                                        </div>
+                                    )}
+
+                                    {reservation.owner_notes && (
+                                        <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-slate-700">
+                                            <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-amber-600">
+                                                <MessageSquare className="h-3.5 w-3.5" />
+                                                Owner&apos;s Note
+                                            </p>
+                                            <p>{reservation.owner_notes}</p>
                                         </div>
                                     )}
 

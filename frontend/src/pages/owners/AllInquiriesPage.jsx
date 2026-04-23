@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -57,6 +57,7 @@ function isReservationAssigned(reservation) {
 
 export default function AllReservationsPage() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { fetchUnreadCount } = useNotifications();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -74,6 +75,17 @@ export default function AllReservationsPage() {
     const [loadingRooms, setLoadingRooms] = useState(false);
 
     useEffect(() => { fetchReservations(); }, []);
+
+    // Auto-open student modal when navigated from a notification (?inquiry=<id>)
+    useEffect(() => {
+        const inquiryId = searchParams.get('inquiry');
+        if (!inquiryId || reservations.length === 0) return;
+        const target = reservations.find((r) => String(r.id) === inquiryId);
+        if (target) {
+            setProfileTarget(target);
+            setSearchParams({}, { replace: true });
+        }
+    }, [reservations, searchParams]);
 
     const fetchReservations = async () => {
         setLoading(true);

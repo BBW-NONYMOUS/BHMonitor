@@ -149,15 +149,17 @@ export default function Sidebar({ open, onClose }) {
                     })}
 
                     {/* Public Finder */}
-                    <NavLink
-                        to="/find-boarding"
-                        target="_blank"
-                        rel="noopener"
-                        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
-                    >
-                        <Search className="h-4 w-4 shrink-0" />
-                        Find Boarding
-                    </NavLink>
+                    {user?.role !== 'owner' && (
+                        <NavLink
+                            to="/find-boarding"
+                            target="_blank"
+                            rel="noopener"
+                            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+                        >
+                            <Search className="h-4 w-4 shrink-0" />
+                            Find Boarding
+                        </NavLink>
+                    )}
                 </nav>
 
                 {/* User */}
@@ -186,21 +188,6 @@ export default function Sidebar({ open, onClose }) {
                         <LogOut className="h-4 w-4" />
                         Logout
                     </button>
-                    {['admin', 'owner'].includes(user?.role) && (
-                        <NavLink
-                            to="/settings"
-                            onClick={onClose}
-                            className={({ isActive }) => cn(
-                                'mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                                isActive
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                            )}
-                        >
-                            <Settings2 className="h-4 w-4" />
-                            Settings
-                        </NavLink>
-                    )}
                 </div>
             </aside>
         </>

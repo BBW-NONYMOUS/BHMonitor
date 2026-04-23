@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Bell, Check, CheckCheck, Trash2, X, Mail, ExternalLink } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, Mail, CheckCircle, XCircle, MessageCircle, UserPlus, Building2, ShieldCheck, ShieldX } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -27,8 +25,65 @@ function formatTimeAgo(dateString) {
     return date.toLocaleDateString();
 }
 
-function NotificationItem({ notification, onMarkAsRead, onDelete, onNavigate }) {
-    const isInquiry = notification.type === 'inquiry';
+function getNotificationPath(type, data, role) {
+    switch (type) {
+        case 'inquiry':
+            if (role === 'admin') {
+                return data?.inquiry_id
+                    ? `/reservations?inquiry=${data.inquiry_id}`
+                    : '/reservations';
+            }
+            // owner
+            if (data?.boarding_house_id) {
+                const base = `/boarding-houses/${data.boarding_house_id}/inquiries`;
+                return data?.inquiry_id ? `${base}?inquiry=${data.inquiry_id}` : base;
+            }
+            return null;
+
+        case 'reservation_approved':
+        case 'reservation_declined':
+        case 'reservation_contacted':
+            return '/student-reservations';
+
+        case 'account_approved':
+        case 'account_rejected':
+            return null;
+
+        case 'new_account_registration':
+            return '/accounts';
+
+        case 'new_boarding_house':
+            return '/boarding-houses';
+
+        case 'boarding_house_approved':
+        case 'boarding_house_rejected':
+            return '/boarding-houses';
+
+        default:
+            return null;
+    }
+}
+
+const NOTIFICATION_ICON_CONFIG = {
+    inquiry:                   { icon: Mail,        color: 'bg-blue-100 text-blue-600' },
+    reservation_approved:      { icon: CheckCircle, color: 'bg-green-100 text-green-600' },
+    reservation_declined:      { icon: XCircle,     color: 'bg-red-100 text-red-600' },
+    reservation_contacted:     { icon: MessageCircle, color: 'bg-yellow-100 text-yellow-600' },
+    account_approved:          { icon: ShieldCheck, color: 'bg-green-100 text-green-600' },
+    account_rejected:          { icon: ShieldX,     color: 'bg-red-100 text-red-600' },
+    new_account_registration:  { icon: UserPlus,    color: 'bg-purple-100 text-purple-600' },
+    new_boarding_house:        { icon: Building2,   color: 'bg-orange-100 text-orange-600' },
+    boarding_house_approved:   { icon: Building2,   color: 'bg-green-100 text-green-600' },
+    boarding_house_rejected:   { icon: Building2,   color: 'bg-red-100 text-red-600' },
+};
+
+function NotificationItem({ notification, userRole, onMarkAsRead, onDelete, onNavigate }) {
+    const config = NOTIFICATION_ICON_CONFIG[notification.type] ?? {
+        icon: Bell,
+        color: 'bg-slate-100 text-slate-600',
+    };
+    const Icon = config.icon;
+    const navigatePath = getNotificationPath(notification.type, notification.data, userRole);
 
     return (
         <div
@@ -40,19 +95,14 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onNavigate }) 
                 if (!notification.is_read) {
                     onMarkAsRead(notification.id);
                 }
-                if (isInquiry && notification.data?.boarding_house_id) {
-                    onNavigate(`/owner/boarding-houses/${notification.data.boarding_house_id}/inquiries`);
+                if (navigatePath) {
+                    onNavigate(navigatePath);
                 }
             }}
         >
             <div className="flex items-start gap-3">
-                <div
-                    className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                        isInquiry ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
-                    )}
-                >
-                    {isInquiry ? <Mail className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', config.color)}>
+                    <Icon className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
@@ -60,7 +110,7 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onNavigate }) 
                             {notification.title}
                         </p>
                         {!notification.is_read && (
-                            <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
                         )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notification.message}</p>
@@ -99,8 +149,9 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onNavigate }) 
 }
 
 export default function NotificationDropdown() {
-    const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, fetchNotifications } =
+    const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification } =
         useNotifications();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
 
@@ -144,7 +195,7 @@ export default function NotificationDropdown() {
                     )}
                 </div>
 
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="max-h-100">
                     {loading && notifications.length === 0 ? (
                         <div className="p-6 text-center text-sm text-slate-500">Loading...</div>
                     ) : notifications.length === 0 ? (
@@ -157,6 +208,7 @@ export default function NotificationDropdown() {
                             <NotificationItem
                                 key={notification.id}
                                 notification={notification}
+                                userRole={user?.role}
                                 onMarkAsRead={markAsRead}
                                 onDelete={deleteNotification}
                                 onNavigate={handleNavigate}

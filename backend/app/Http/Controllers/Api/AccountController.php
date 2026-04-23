@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AccountApproved;
 use App\Mail\AccountRejected;
 use App\Models\ActivityLog;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,6 +62,8 @@ class AccountController extends Controller
 
         Mail::to($user->email)->send(new AccountApproved($user));
 
+        Notification::createAccountStatusNotification($user, 'approved');
+
         ActivityLog::create([
             'user_id'    => $request->user()->id,
             'action'     => "Approved account for {$user->name} ({$user->role}).",
@@ -94,6 +97,8 @@ class AccountController extends Controller
         ]);
 
         Mail::to($user->email)->send(new AccountRejected($user, $rejectionReason));
+
+        Notification::createAccountStatusNotification($user, 'rejected', $rejectionReason);
 
         // Revoke all tokens so they cannot use any existing sessions
         $user->tokens()->delete();

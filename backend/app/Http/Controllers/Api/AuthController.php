@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Notification;
 use App\Models\Owner;
 use App\Models\Student;
 use App\Models\User;
@@ -149,6 +150,11 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
+        // Notify all admins of the new pending account
+        User::where('role', 'admin')->each(function (User $admin) use ($user) {
+            Notification::createNewAccountRegistrationNotification($admin, $user);
+        });
+
         // Return without token — account is pending, they must wait for approval
         return response()->json([
             'account_status' => 'pending',
@@ -192,6 +198,11 @@ class AuthController extends Controller
             'action'     => "Owner {$user->name} registered and is awaiting approval.",
             'created_at' => now(),
         ]);
+
+        // Notify all admins of the new pending account
+        User::where('role', 'admin')->each(function (User $admin) use ($user) {
+            Notification::createNewAccountRegistrationNotification($admin, $user);
+        });
 
         // Return without token — account is pending
         return response()->json([

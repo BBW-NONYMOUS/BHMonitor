@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
+use App\Models\Notification;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -77,6 +79,13 @@ class BoardingHouseController extends Controller
             'action'     => "Added boarding house: {$bh->boarding_name}.",
             'created_at' => now(),
         ]);
+
+        // Notify all admins when an owner submits a new boarding house for approval
+        if ($user->isOwner()) {
+            User::where('role', 'admin')->each(function (User $admin) use ($bh) {
+                Notification::createNewBoardingHouseNotification($admin, $bh);
+            });
+        }
 
         return response()->json($bh->load('owner'), 201);
     }
@@ -157,6 +166,12 @@ class BoardingHouseController extends Controller
             'created_at' => now(),
         ]);
 
+        // Notify the owner
+        $ownerUser = $boardingHouse->owner?->user;
+        if ($ownerUser) {
+            Notification::createBoardingHouseStatusNotification($ownerUser, $boardingHouse, 'approved');
+        }
+
         return response()->json($boardingHouse->load('owner'));
     }
 
@@ -174,6 +189,12 @@ class BoardingHouseController extends Controller
             'action'     => "Rejected boarding house: {$boardingHouse->boarding_name}.",
             'created_at' => now(),
         ]);
+
+        // Notify the owner
+        $ownerUser = $boardingHouse->owner?->user;
+        if ($ownerUser) {
+            Notification::createBoardingHouseStatusNotification($ownerUser, $boardingHouse, 'rejected', $data['admin_notes'] ?? null);
+        }
 
         return response()->json($boardingHouse->load('owner'));
     }

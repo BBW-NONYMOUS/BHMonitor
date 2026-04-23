@@ -402,7 +402,7 @@ export default function RoomsPage() {
 
             {isOwner() && (
                 <Dialog open={open} onOpenChange={setOpen}>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto scroll-smooth">
                         <DialogHeader>
                             <DialogTitle>{editing ? 'Edit' : 'Add'} Room</DialogTitle>
                         </DialogHeader>

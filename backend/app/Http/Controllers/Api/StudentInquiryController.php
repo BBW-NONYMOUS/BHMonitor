@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\StudentBoardingHistory;
 use App\Models\StudentInquiry;
 use App\Models\Notification;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -149,6 +150,11 @@ class StudentInquiryController extends Controller
             Notification::createInquiryNotification($bh->owner->user, $inquiry, $bh);
         }
 
+        // Notify all admins
+        User::where('role', 'admin')->each(function (User $admin) use ($inquiry, $bh) {
+            Notification::createInquiryNotification($admin, $inquiry, $bh);
+        });
+
         return response()->json([
             'message'     => 'Your reservation has been submitted! The owner will contact you soon.',
             'reservation' => $inquiry,
@@ -202,6 +208,25 @@ class StudentInquiryController extends Controller
 
         if (isset($validated['status'])) {
             $this->syncApprovedReservation($inquiry, $request);
+
+            // Notify the student when owner changes reservation status
+            if (in_array($validated['status'], ['approved', 'declined', 'contacted'])) {
+                $studentUser = null;
+                if ($inquiry->student && $inquiry->student->user_id) {
+                    $studentUser = User::find($inquiry->student->user_id);
+                } elseif ($inquiry->email) {
+                    $studentUser = User::where('email', $inquiry->email)->first();
+                }
+
+                if ($studentUser) {
+                    Notification::createReservationStatusNotification(
+                        $studentUser,
+                        $inquiry,
+                        $inquiry->boardingHouse,
+                        $validated['status']
+                    );
+                }
+            }
         }
 
         return response()->json([

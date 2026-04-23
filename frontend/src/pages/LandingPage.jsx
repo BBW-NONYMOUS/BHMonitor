@@ -75,22 +75,14 @@ export default function LandingPage() {
                         <Link to="/login">
                             <Button
                                 variant="ghost"
-                                size="sm"
+                                size="md"
                                 className={`font-medium transition-colors ${
                                     scrolled
-                                        ? 'text-slate-700 hover:bg-slate-100'
-                                        : 'text-white hover:bg-white/15'
+                                        ? 'text-slate-700  hover:bg-slate-100 '
+                                        : 'text-white hover:bg-white/15 '
                                 }`}
                             >
-                                Sign In
-                            </Button>
-                        </Link>
-                        <Link to="/register-owner">
-                            <Button
-                                size="sm"
-                                className="bg-blue-600 font-medium text-white shadow-sm hover:bg-blue-700"
-                            >
-                                Get Started
+                                Login
                             </Button>
                         </Link>
                     </div>
@@ -132,7 +124,7 @@ export default function LandingPage() {
                         <div className="flex flex-col gap-2">
                             <Link to="/login" onClick={() => setMenuOpen(false)}>
                                 <Button variant="outline" className="w-full font-medium">
-                                    Sign In
+                                    Login
                                 </Button>
                             </Link>
                             <Link to="/register-owner" onClick={() => setMenuOpen(false)}>
@@ -159,7 +151,7 @@ export default function LandingPage() {
                     <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1.5">
                         <Star className="h-3.5 w-3.5 text-blue-400" />
                         <span className="text-xs font-medium text-blue-300 sm:text-sm">
-                            Trusted by students across the city
+                            Trusted by students across in <label className="font-bold text-2md text-green-300">kalamansig</label>
                         </span>
                     </div>
 
@@ -185,16 +177,6 @@ export default function LandingPage() {
                                 <Search className="h-5 w-5" />
                                 Find Boarding Houses
                                 <ArrowRight className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        <Link to="/register-owner" className="w-full sm:w-auto">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                className="w-full gap-2 border-white/25 bg-white/5 px-7 py-6 text-base font-semibold text-white backdrop-blur-sm hover:border-white/40 hover:bg-white/10 hover:shadow-lg transition-all duration-300 hover:scale-105 sm:w-auto"
-                            >
-                                <UserPlus className="h-5 w-5" />
-                                List Your Property
                             </Button>
                         </Link>
                     </div>
@@ -303,27 +285,6 @@ export default function LandingPage() {
                                     </li>
                                 ))}
                             </ul>
-
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                                <Link to="/register-owner">
-                                    <Button
-                                        size="lg"
-                                        className="w-full gap-2 bg-blue-600 font-semibold hover:bg-blue-700 sm:w-auto"
-                                    >
-                                        <Building2 className="h-5 w-5" />
-                                        Register Your Property
-                                    </Button>
-                                </Link>
-                                <Link to="/login">
-                                    <Button
-                                        size="lg"
-                                        variant="outline"
-                                        className="w-full font-semibold sm:w-auto"
-                                    >
-                                        Sign In
-                                    </Button>
-                                </Link>
-                            </div>
                         </div>
 
                         {/* Illustration */}
@@ -348,37 +309,6 @@ export default function LandingPage() {
             </section>
 
             {/* ── CTA Banner ─────────────────────────────────────────────── */}
-            <section className="bg-linear-to-r from-blue-600 to-indigo-700 px-4 py-16 sm:px-6 sm:py-20">
-                <div className="mx-auto max-w-3xl text-center">
-                    <h2 className="mb-4 text-2xl font-bold text-white sm:text-3xl lg:text-4xl">
-                        Ready to Find Your New Home?
-                    </h2>
-                    <p className="mb-8 text-blue-100 sm:text-lg">
-                        Join thousands of students who found their perfect boarding house with us.
-                    </p>
-                    <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                        <Link to="/find-boarding" className="w-full sm:w-auto">
-                            <Button
-                                size="lg"
-                                className="w-full gap-2 bg-white px-8 font-semibold text-blue-700 hover:bg-blue-50 sm:w-auto"
-                            >
-                                <Search className="h-4 w-4" />
-                                Start Searching
-                            </Button>
-                        </Link>
-                        <Link to="/register-owner" className="w-full sm:w-auto">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                className="w-full gap-2 border-white/40 bg-transparent font-semibold text-white hover:bg-white/10 sm:w-auto"
-                            >
-                                <UserPlus className="h-4 w-4" />
-                                Register as Owner
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-            </section>
 
             {/* ── Footer ─────────────────────────────────────────────────── */}
             <footer className="bg-slate-900 px-4 py-10 sm:px-6">
@@ -401,7 +331,7 @@ export default function LandingPage() {
                                 Find Boarding
                             </Link>
                             <Link to="/login" className="transition-colors hover:text-white">
-                                Sign In
+                                LogIn
                             </Link>
                         </nav>
                     </div>
