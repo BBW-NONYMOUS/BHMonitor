@@ -97,7 +97,7 @@ class AuthController extends Controller
             'gender'         => 'nullable|in:Male,Female',
             'course'         => 'nullable|string|max:255',
             'year_level'     => 'nullable|string|max:50',
-            'contact_number' => 'nullable|string|max:20',
+            'contact_number' => 'nullable|digits_between:1,11',
             'address'        => 'nullable|string|max:500',
             'profile_photo'  => 'nullable|image|max:5120',
         ]);
@@ -169,7 +169,7 @@ class AuthController extends Controller
             'email'          => 'required|email|unique:users',
             'password'       => 'required|min:6|confirmed',
             'full_name'      => 'required|string|max:255',
-            'contact_number' => 'nullable|string|max:20',
+            'contact_number' => 'nullable|digits_between:1,11',
             'address'        => 'nullable|string',
             'profile_photo'  => 'nullable|image|max:5120',
         ]);
@@ -225,7 +225,7 @@ class AuthController extends Controller
 
         if ($user->isOwner()) {
             $rules['full_name'] = 'sometimes|string|max:255';
-            $rules['contact_number'] = 'nullable|string|max:20';
+            $rules['contact_number'] = 'nullable|digits_between:1,11';
             $rules['address'] = 'nullable|string|max:500';
         }
 

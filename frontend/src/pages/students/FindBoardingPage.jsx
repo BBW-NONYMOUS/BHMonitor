@@ -23,8 +23,8 @@ const SKSU_KALAMANSIG = [6.5575957, 124.048627];
 
 // Custom marker icons with availability count badge
 const createCustomIcon = (color, available, size = 30) => {
-    const badgeColor = available >= 5 ? '#16a34a' : available >= 1 ? '#ca8a04' : '#dc2626';
-    const badgeBg = available >= 5 ? '#dcfce7' : available >= 1 ? '#fef9c3' : '#fee2e2';
+    const badgeColor = available >= 1 ? '#16a34a' : '#dc2626';
+    const badgeBg = available >= 1 ? '#dcfce7' : '#fee2e2';
     return L.divIcon({
         className: 'custom-marker',
         html: `<div style="position: relative;">
@@ -117,16 +117,14 @@ const studentLocationIcon = L.divIcon({
 
 const getMarkerIcon = (available) => {
     if (available === null || available === undefined) return createCustomIcon('#9ca3af', 0);
-    if (available >= 5) return createCustomIcon('#22c55e', available);
-    if (available >= 1) return createCustomIcon('#eab308', available);
+    if (available >= 1) return createCustomIcon('#22c55e', available);
     return createCustomIcon('#ef4444', available);
 };
 
 // Compute availability status based on room availability count
 const computeAvailabilityStatus = (available) => {
     if (available === null || available === undefined || available === 0) return 'full';
-    if (available >= 5) return 'available';
-    return 'limited';
+    return 'available';
 };
 
 // Calculate distance between two coordinates in km
@@ -180,7 +178,7 @@ export default function FindBoardingPage() {
     const [loading, setLoading] = useState(false);
     const [coords, setCoords] = useState(null);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
-    const [availabilityFilter, setAvailabilityFilter] = useState([]); // ['available', 'limited', 'full']
+    const [availabilityFilter, setAvailabilityFilter] = useState([]); // ['available', 'full']
     const [filters, setFilters] = useState({
         search: '', max_price: '', gender_type: '', sort: 'latest',
     });
@@ -301,10 +299,6 @@ export default function FindBoardingPage() {
                                     Available
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                                    Limited
-                                </span>
-                                <span className="flex items-center gap-1">
                                     <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
                                     Full
                                 </span>
@@ -328,21 +322,6 @@ export default function FindBoardingPage() {
                             >
                                 <span className="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
                                 Available
-                            </Button>
-                            <Button
-                                variant={availabilityFilter.includes('limited') ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                    setAvailabilityFilter(prev =>
-                                        prev.includes('limited')
-                                            ? prev.filter(s => s !== 'limited')
-                                            : [...prev, 'limited']
-                                    );
-                                }}
-                                className={availabilityFilter.includes('limited') ? 'bg-amber-500 hover:bg-amber-600' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}
-                            >
-                                <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
-                                Limited
                             </Button>
                             <Button
                                 variant={availabilityFilter.includes('full') ? 'default' : 'outline'}
@@ -519,8 +498,7 @@ export default function FindBoardingPage() {
                                                 {/* Availability Badge */}
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                        (m.available || 0) >= 5 ? 'bg-green-100 text-green-700' :
-                                                        (m.available || 0) >= 1 ? 'bg-yellow-100 text-yellow-700' :
+                                                        (m.available || 0) >= 1 ? 'bg-green-100 text-green-700' :
                                                         'bg-red-100 text-red-700'
                                                     }`}>
                                                         {m.available || 0} room{(m.available || 0) !== 1 ? 's' : ''} available
@@ -586,8 +564,7 @@ export default function FindBoardingPage() {
                                             <div className="flex items-start justify-between gap-2 mb-2">
                                                 <h3 className="font-semibold text-slate-900">{bh.boarding_name}</h3>
                                                 <Badge className={`${
-                                                    (bh.available_rooms || 0) >= 5 ? 'bg-green-100 text-green-700' :
-                                                    (bh.available_rooms || 0) >= 1 ? 'bg-yellow-100 text-yellow-700' :
+                                                    (bh.available_rooms || 0) >= 1 ? 'bg-green-100 text-green-700' :
                                                     'bg-red-100 text-red-700'
                                                 }`}>
                                                     {bh.available_rooms || 0} available

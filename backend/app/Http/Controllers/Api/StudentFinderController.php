@@ -40,13 +40,7 @@ class StudentFinderController extends Controller
             if (!empty($statuses)) {
                 $query->where(function ($q) use ($statuses) {
                     if (in_array('available', $statuses, true)) {
-                        $q->orWhere('available_rooms', '>=', 5);
-                    }
-                    if (in_array('limited', $statuses, true)) {
-                        $q->orWhere(function ($limited) {
-                            $limited->where('available_rooms', '>', 0)
-                                ->where('available_rooms', '<', 5);
-                        });
+                        $q->orWhere('available_rooms', '>', 0);
                     }
                     if (in_array('full', $statuses, true)) {
                         $q->orWhere('available_rooms', '<=', 0);

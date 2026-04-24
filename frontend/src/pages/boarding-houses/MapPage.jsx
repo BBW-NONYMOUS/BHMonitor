@@ -70,8 +70,8 @@ const MAP_LAYERS = {
 
 // Custom marker icons with availability count badge
 const createCustomIcon = (color, available, size = 30) => {
-    const badgeColor = available >= 5 ? '#16a34a' : available >= 1 ? '#ca8a04' : '#dc2626';
-    const badgeBg = available >= 5 ? '#dcfce7' : available >= 1 ? '#fef9c3' : '#fee2e2';
+    const badgeColor = available >= 1 ? '#16a34a' : '#dc2626';
+    const badgeBg = available >= 1 ? '#dcfce7' : '#fee2e2';
     return L.divIcon({
         className: 'custom-marker',
         html: `<div style="position: relative;">
@@ -133,8 +133,7 @@ const campusIcon = L.divIcon({
 
 const getMarkerIcon = (available) => {
     if (available === null || available === undefined) return createCustomIcon('#9ca3af', 0); // gray - unknown
-    if (available >= 5) return createCustomIcon('#22c55e', available); // green - many available
-    if (available >= 1) return createCustomIcon('#eab308', available); // yellow - limited
+    if (available >= 1) return createCustomIcon('#22c55e', available); // green - available
     return createCustomIcon('#ef4444', available); // red - full
 };
 
@@ -217,7 +216,7 @@ export default function MapPage() {
     
     // Filter states
     const [filters, setFilters] = useState({
-        availability: 'all', // all, available, limited, full
+        availability: 'all', // all, available, full
         maxDistance: '', // km from campus
         maxPrice: '',
         search: '',
@@ -243,8 +242,7 @@ export default function MapPage() {
                     return false;
                 }
                 // Availability filter
-                if (filters.availability === 'available' && (m.available || 0) < 5) return false;
-                if (filters.availability === 'limited' && ((m.available || 0) < 1 || (m.available || 0) >= 5)) return false;
+                if (filters.availability === 'available' && (m.available || 0) <= 0) return false;
                 if (filters.availability === 'full' && (m.available || 0) > 0) return false;
                 // Distance filter
                 if (filters.maxDistance && m.distance > parseFloat(filters.maxDistance)) return false;
@@ -271,8 +269,7 @@ export default function MapPage() {
     // Stats
     const stats = useMemo(() => ({
         total: markers.length,
-        available: markers.filter(m => (m.available || 0) >= 5).length,
-        limited: markers.filter(m => (m.available || 0) >= 1 && (m.available || 0) < 5).length,
+        available: markers.filter(m => (m.available || 0) > 0).length,
         full: markers.filter(m => (m.available || 0) === 0).length,
         totalStudents: markers.reduce((sum, m) => sum + (m.students_count || 0), 0),
     }), [markers]);
@@ -308,10 +305,6 @@ export default function MapPage() {
                     <span className="text-slate-600">Available ({stats.available})</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                    <span className="text-slate-600">Limited ({stats.limited})</span>
-                </div>
-                <div className="flex items-center gap-1">
                     <span className="w-3 h-3 rounded-full bg-red-500"></span>
                     <span className="text-slate-600">Full ({stats.full})</span>
                 </div>
@@ -343,8 +336,7 @@ export default function MapPage() {
                             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All</SelectItem>
-                                <SelectItem value="available">Available (5+ rooms)</SelectItem>
-                                <SelectItem value="limited">Limited (1-4 rooms)</SelectItem>
+                                <SelectItem value="available">Available (1+ rooms)</SelectItem>
                                 <SelectItem value="full">Full (0 rooms)</SelectItem>
                             </SelectContent>
                         </Select>
@@ -415,12 +407,10 @@ export default function MapPage() {
                                         {/* Availability Badge */}
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                (m.available || 0) >= 5 ? 'bg-green-100 text-green-700' :
-                                                (m.available || 0) >= 1 ? 'bg-yellow-100 text-yellow-700' :
+                                                (m.available || 0) >= 1 ? 'bg-green-100 text-green-700' :
                                                 'bg-red-100 text-red-700'
                                             }`}>
-                                                {(m.available || 0) >= 5 ? 'Available' :
-                                                 (m.available || 0) >= 1 ? 'Limited' : 'Full'}
+                                                {(m.available || 0) >= 1 ? 'Available' : 'Full'}
                                             </span>
                                             <span className="text-xs text-slate-600">
                                                 {m.available || 0} room{(m.available || 0) !== 1 ? 's' : ''} available
@@ -517,8 +507,7 @@ export default function MapPage() {
                                             <p className="text-xs text-slate-500 mt-0.5">{m.address}</p>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                            (m.available || 0) >= 5 ? 'bg-green-100 text-green-700' :
-                                            (m.available || 0) >= 1 ? 'bg-yellow-100 text-yellow-700' :
+                                            (m.available || 0) >= 1 ? 'bg-green-100 text-green-700' :
                                             'bg-red-100 text-red-700'
                                         }`}>
                                             {m.available || 0} rooms
