@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pending-approvals',                    [StudentController::class, 'pendingApprovals']);
     Route::post('/students/{student}/approve-boarding', [StudentController::class, 'approveBoardingStudent']);
     Route::post('/students/{student}/decline-boarding', [StudentController::class, 'declineBoardingStudent']);
+    Route::post('/students/{student}/warnings',         [StudentController::class, 'addWarning']);
 
     // Student Documents
     Route::get('/students/{student}/documents',                         [StudentDocumentController::class, 'index']);

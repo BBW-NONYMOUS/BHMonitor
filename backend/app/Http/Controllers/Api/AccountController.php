@@ -8,6 +8,7 @@ use App\Mail\AccountRejected;
 use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
 use App\Models\Notification;
+use App\Models\StudentWarning;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -85,11 +86,8 @@ class AccountController extends Controller
             return response()->json(['message' => 'Cannot modify admin accounts.'], 403);
         }
 
-        // Admin can only approve owners
+        // Admin approves user accounts. Student boarding-house acceptance remains owner-controlled.
         if ($actor->isAdmin()) {
-            if (!$user->isOwner()) {
-                return response()->json(['message' => 'Only admins can approve owner accounts.'], 403);
-            }
             $user->update([
                 'account_status'   => 'approved',
                 'rejection_reason' => null,
@@ -98,6 +96,11 @@ class AccountController extends Controller
         // Owners can only approve their students
         elseif ($actor->isOwner()) {
             $this->authorizeOwnerStudent($actor, $user);
+
+            $user->update([
+                'account_status'   => 'approved',
+                'rejection_reason' => null,
+            ]);
 
             $user->student?->update([
                 'boarding_approval_status' => 'approved',
@@ -137,15 +140,14 @@ class AccountController extends Controller
 
         $data = $request->validate([
             'rejection_reason' => 'nullable|string|max:500',
+            'mark_warning' => 'nullable|boolean',
         ]);
 
         $rejectionReason = $data['rejection_reason'] ?? null;
+        $markWarning = (bool) ($data['mark_warning'] ?? false);
 
-        // Admin can only reject owners
+        // Admin rejects user accounts. Owners reject boarding-house registrations.
         if ($actor->isAdmin()) {
-            if (!$user->isOwner()) {
-                return response()->json(['message' => 'Only admins can reject owner accounts.'], 403);
-            }
             $user->update([
                 'account_status'   => 'rejected',
                 'rejection_reason' => $rejectionReason,
@@ -159,9 +161,22 @@ class AccountController extends Controller
             $this->authorizeOwnerStudent($actor, $user);
 
             $user->student?->update([
-                'boarding_approval_status' => 'rejected',
+                'boarding_approval_status' => 'declined',
                 'boarding_rejection_comment' => $rejectionReason,
+                'has_warning' => $markWarning ? true : $user->student->has_warning,
+                'warning_comment' => $markWarning ? $rejectionReason : $user->student->warning_comment,
+                'warning_marked_by' => $markWarning ? $actor->id : $user->student->warning_marked_by,
+                'warning_marked_at' => $markWarning ? now() : $user->student->warning_marked_at,
             ]);
+
+            if ($markWarning && $rejectionReason && $user->student) {
+                StudentWarning::create([
+                    'student_id' => $user->student->id,
+                    'owner_id' => $actor->owner?->id,
+                    'boarding_house_name' => $user->student->boardingHouse?->boarding_name,
+                    'comment' => $rejectionReason,
+                ]);
+            }
 
             if ($user->account_status === 'pending') {
                 $user->update([
@@ -254,6 +269,9 @@ class AccountController extends Controller
             'boarding_house'   => $user->student?->boardingHouse?->boarding_name,
             'boarding_approval_status' => $user->student?->boarding_approval_status,
             'boarding_rejection_comment' => $user->student?->boarding_rejection_comment,
+            'has_warning' => (bool) $user->student?->has_warning,
+            'warning_comment' => $user->student?->warning_comment,
+            'warnings_count' => $user->student?->warnings()->count() ?? 0,
         ];
     }
 

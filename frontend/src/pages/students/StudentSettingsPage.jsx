@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, UserRound } from 'lucide-react';
+import { AlertTriangle, Loader2, Save, UserRound } from 'lucide-react';
 
 const blankForm = {
     first_name: '',
@@ -27,7 +27,7 @@ const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'];
 
 function statusClass(status) {
     if (status === 'approved') return 'border-green-200 bg-green-50 text-green-700';
-    if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
+    if (status === 'rejected' || status === 'declined') return 'border-red-200 bg-red-50 text-red-700';
     return 'border-amber-200 bg-amber-50 text-amber-700';
 }
 
@@ -135,6 +135,16 @@ export default function StudentSettingsPage() {
                                 {student?.boarding_rejection_comment && (
                                     <p className="mt-2 text-sm text-red-600">{student.boarding_rejection_comment}</p>
                                 )}
+                            </div>
+                        )}
+
+                        {student?.has_warning && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                <div className="flex items-center gap-2 font-medium text-amber-900">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    Account warning
+                                </div>
+                                <p className="mt-1">{student.warning_comment || 'Your student account has a warning comment.'}</p>
                             </div>
                         )}
 

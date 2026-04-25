@@ -13,10 +13,19 @@ class Student extends Model
         'user_id', 'student_no', 'first_name', 'last_name', 'gender', 'course',
         'year_level', 'contact_number', 'address', 'parent_name', 'parent_contact',
         'image', 'boarding_house_id', 'boarding_approval_status',
-        'boarding_rejection_comment', 'room_id',
+        'boarding_rejection_comment', 'has_warning', 'warning_comment',
+        'warning_marked_by', 'warning_marked_at', 'room_id',
     ];
 
     protected $appends = ['image_url', 'full_name'];
+
+    protected function casts(): array
+    {
+        return [
+            'has_warning' => 'boolean',
+            'warning_marked_at' => 'datetime',
+        ];
+    }
 
     public function getImageUrlAttribute(): ?string
     {
@@ -43,6 +52,11 @@ class Student extends Model
         return $this->hasMany(StudentBoardingHistory::class)->orderByDesc('boarded_at');
     }
 
+    public function warningMarkedBy()
+    {
+        return $this->belongsTo(User::class, 'warning_marked_by');
+    }
+
     public function documents()
     {
         return $this->hasMany(StudentDocument::class);
@@ -56,6 +70,11 @@ class Student extends Model
     public function recommendations()
     {
         return $this->hasMany(StudentRecommendation::class);
+    }
+
+    public function warnings()
+    {
+        return $this->hasMany(StudentWarning::class)->latest();
     }
 
     public function getFullNameAttribute(): string

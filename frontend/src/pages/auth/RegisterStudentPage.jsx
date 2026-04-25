@@ -20,13 +20,13 @@ export default function RegisterStudentPage() {
         student_no: '', first_name: '', last_name: '',
         email: '', password: '', password_confirmation: '',
         gender: '', course: '', year_level: '', contact_number: '', address: '',
-        boarding_house_id: '',
+        parent_name: '', parent_contact: '', boarding_house_id: '',
     });
+    const [boardingHouses, setBoardingHouses] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
     const [registered, setRegistered] = useState(false);
-    const [boardingHouses, setBoardingHouses] = useState([]);
-    const [boardingHousesLoading, setBoardingHousesLoading] = useState(false);
+    const [registrationResult, setRegistrationResult] = useState(null);
     const photoInputRef = useRef(null);
 
     // Pre-fill from Google OAuth redirect (?email=...&name=...)
@@ -45,24 +45,9 @@ export default function RegisterStudentPage() {
     }, [searchParams]);
 
     useEffect(() => {
-        let active = true;
-        setBoardingHousesLoading(true);
-
         api.get('/find-boarding?per_page=100')
-            .then(({ data }) => {
-                if (!active) return;
-                setBoardingHouses(data?.data || []);
-            })
-            .catch(() => {
-                if (active) toast.error('Failed to load registered boarding houses.');
-            })
-            .finally(() => {
-                if (active) setBoardingHousesLoading(false);
-            });
-
-        return () => {
-            active = false;
-        };
+            .then(({ data }) => setBoardingHouses(data?.data || []))
+            .catch(() => setBoardingHouses([]));
     }, []);
 
     // Profile photo state - REQ-002
@@ -147,10 +132,13 @@ export default function RegisterStudentPage() {
                     course: form.course || null,
                     address: form.address || null,
                     contact_number: form.contact_number || null,
+                    parent_name: form.parent_name || null,
+                    parent_contact: form.parent_contact || null,
                 };
             }
 
-            await registerStudent(payload);
+            const result = await registerStudent(payload);
+            setRegistrationResult(result);
             setRegistered(true);
         } catch (err) {
             if (err.response?.data?.errors) {
@@ -164,6 +152,8 @@ export default function RegisterStudentPage() {
     };
 
     if (registered) {
+        const isOwnerReview = registrationResult?.approval_reviewer === 'owner';
+
         return (
             <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 to-green-900 p-4">
                 <div className="w-full max-w-md">
@@ -178,8 +168,10 @@ export default function RegisterStudentPage() {
                             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-800">
                                 <Clock className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                                 <div>
-                                    <p className="font-semibold">Awaiting Admin Approval</p>
-                                    <p className="mt-1">Your account has been submitted and is pending review. You will be notified once approved — then you can log in.</p>
+                                    <p className="font-semibold">{isOwnerReview ? 'Awaiting Owner Approval' : 'Awaiting Admin Approval'}</p>
+                                    <p className="mt-1">
+                                        {registrationResult?.message || 'Your account has been submitted and is pending review.'}
+                                    </p>
                                 </div>
                             </div>
                             <Link to="/login">
@@ -214,7 +206,7 @@ export default function RegisterStudentPage() {
                 <Card className="shadow-2xl">
                     <CardHeader>
                         <CardTitle className="text-2xl">Create Student Account</CardTitle>
-                        <CardDescription>Register to find and track your boarding house.</CardDescription>
+                        <CardDescription>Register your account, school details, contacts, and boarding house.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {/* Google register */}
@@ -238,7 +230,7 @@ export default function RegisterStudentPage() {
                                     <Input type="email" placeholder="you@example.com" value={form.email} onChange={set('email')} required />
                                     {errors.email && <p className="text-xs text-red-500">{errors.email[0]}</p>}
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label>Password *</Label>
                                         <Input type="password" placeholder="Min. 6 characters" value={form.password} onChange={set('password')} required />
@@ -296,7 +288,7 @@ export default function RegisterStudentPage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label>First Name *</Label>
                                         <Input placeholder="Juan" value={form.first_name} onChange={set('first_name')} required />
@@ -308,7 +300,7 @@ export default function RegisterStudentPage() {
                                         {errors.last_name && <p className="text-xs text-red-500">{errors.last_name[0]}</p>}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label>Gender</Label>
                                         <Select value={form.gender} onValueChange={set('gender')}>
@@ -319,19 +311,45 @@ export default function RegisterStudentPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Contact Details */}
+                            <div className="space-y-3 border-t pt-4">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Contact Details</h3>
+                                <div className="space-y-1">
+                                    <Label>Contact Number</Label>
+                                    <Input
+                                        placeholder="09171234567"
+                                        value={form.contact_number}
+                                        onChange={setContactNumber}
+                                        inputMode="numeric"
+                                        maxLength={11}
+                                    />
+                                    {errors.contact_number && <p className="text-xs text-red-500">{errors.contact_number[0]}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Home Address</Label>
+                                    <Input placeholder="Purok, Barangay, Municipality" value={form.address} onChange={set('address')} />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
-                                        <Label>Contact Number</Label>
-                                        <Input
-                                            placeholder="09171234567"
-                                            value={form.contact_number}
-                                            onChange={setContactNumber}
-                                            inputMode="numeric"
-                                            maxLength={11}
-                                        />
-                                        {errors.contact_number && <p className="text-xs text-red-500">{errors.contact_number[0]}</p>}
+                                        <Label>Parent / Guardian Name</Label>
+                                        <Input placeholder="Guardian full name" value={form.parent_name} onChange={set('parent_name')} />
+                                        {errors.parent_name && <p className="text-xs text-red-500">{errors.parent_name[0]}</p>}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Parent Contact</Label>
+                                        <Input placeholder="Guardian contact number" value={form.parent_contact} onChange={set('parent_contact')} maxLength={20} />
+                                        {errors.parent_contact && <p className="text-xs text-red-500">{errors.parent_contact[0]}</p>}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                            </div>
+
+                            {/* School Info */}
+                            <div className="space-y-3 border-t pt-4">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">School Information</h3>
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label>Course</Label>
                                         <Input placeholder="e.g. BSIT" value={form.course} onChange={set('course')} />
@@ -348,23 +366,18 @@ export default function RegisterStudentPage() {
                                         </Select>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Boarding House Info */}
+                            <div className="space-y-3 border-t pt-4">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Boarding House Information</h3>
                                 <div className="space-y-1">
-                                    <Label>Home Address</Label>
-                                    <Input placeholder="Purok, Barangay, Municipality" value={form.address} onChange={set('address')} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label>Registered BH for Reservation</Label>
-                                    <Select
-                                        value={String(form.boarding_house_id || '')}
-                                        onValueChange={(value) => setForm(p => ({ ...p, boarding_house_id: value === 'none' ? '' : value }))}
-                                        disabled={boardingHousesLoading}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder={boardingHousesLoading ? 'Loading boarding houses...' : 'Select boarding house'} />
-                                        </SelectTrigger>
+                                    <Label>Boarding House</Label>
+                                    <Select value={String(form.boarding_house_id || '')} onValueChange={(value) => set('boarding_house_id')(value === 'none' ? '' : value)}>
+                                        <SelectTrigger><SelectValue placeholder="Select your current boarding house" /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">No reservation yet</SelectItem>
-                                            {boardingHouses.map(bh => (
+                                            <SelectItem value="none">No boarding house yet</SelectItem>
+                                            {boardingHouses.map((bh) => (
                                                 <SelectItem key={bh.id} value={String(bh.id)}>
                                                     {bh.boarding_name}{bh.address ? ` - ${bh.address}` : ''}
                                                 </SelectItem>
@@ -372,6 +385,7 @@ export default function RegisterStudentPage() {
                                         </SelectContent>
                                     </Select>
                                     {errors.boarding_house_id && <p className="text-xs text-red-500">{errors.boarding_house_id[0]}</p>}
+                                    <p className="text-xs text-slate-500">The selected boarding house owner can accept or reject your registration.</p>
                                 </div>
                             </div>
 

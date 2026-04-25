@@ -47,9 +47,13 @@ class AuthController extends Controller
 
         // Block pending accounts
         if ($user->account_status === 'pending') {
+            $reviewer = $user->isStudent() && $user->student?->boarding_house_id
+                ? 'boarding house owner'
+                : 'admin';
+
             return response()->json([
                 'account_status' => 'pending',
-                'message'        => 'Your account is pending admin approval. Please wait for confirmation.',
+                'message'        => "Your account is pending {$reviewer} approval. Please wait for confirmation.",
             ], 403);
         }
 
@@ -100,6 +104,8 @@ class AuthController extends Controller
             'year_level'     => 'nullable|string|max:50',
             'contact_number' => 'nullable|digits_between:1,11',
             'address'        => 'nullable|string|max:500',
+            'parent_name'    => 'nullable|string|max:255',
+            'parent_contact' => 'nullable|string|max:20',
             'boarding_house_id' => 'nullable|exists:boarding_houses,id',
             'profile_photo'  => 'nullable|image|max:5120',
         ]);
@@ -107,7 +113,8 @@ class AuthController extends Controller
         $profilePhoto = $this->storeProfilePhoto($request);
 
         // Normalize empty string to null so FK column receives null, not ""
-        $data['boarding_house_id'] = $data['boarding_house_id'] ?: null;
+        $data['boarding_house_id'] = $data['boarding_house_id'] ?? null;
+        $hasSelectedBoardingHouse = !empty($data['boarding_house_id']);
 
         // If a student record with this student_no already exists, link to it
         $existingStudent = Student::where('student_no', $data['student_no'])->first();
@@ -126,14 +133,22 @@ class AuthController extends Controller
             'email'          => $data['email'],
             'password'       => Hash::make($data['password']),
             'role'           => 'student',
-            'account_status' => 'pending', // Students require admin approval
+            'account_status' => 'pending',
             'profile_photo'  => $profilePhoto,
         ]);
 
         if ($existingStudent) {
             $existingStudent->update([
                 'user_id'            => $user->id,
+                'first_name'         => $data['first_name'],
+                'last_name'          => $data['last_name'],
+                'gender'             => $data['gender'] ?? $existingStudent->gender,
+                'course'             => $data['course'] ?? $existingStudent->course,
+                'year_level'         => $data['year_level'] ?? $existingStudent->year_level,
+                'contact_number'     => $data['contact_number'] ?? $existingStudent->contact_number,
                 'address'            => $data['address'] ?? $existingStudent->address,
+                'parent_name'        => $data['parent_name'] ?? $existingStudent->parent_name,
+                'parent_contact'     => $data['parent_contact'] ?? $existingStudent->parent_contact,
                 'boarding_house_id'  => $data['boarding_house_id'] ?? $existingStudent->boarding_house_id,
                 'boarding_approval_status' => !empty($data['boarding_house_id']) ? 'pending' : $existingStudent->boarding_approval_status,
                 'boarding_rejection_comment' => !empty($data['boarding_house_id']) ? null : $existingStudent->boarding_rejection_comment,
@@ -149,6 +164,8 @@ class AuthController extends Controller
                 'year_level'     => $data['year_level'] ?? null,
                 'contact_number' => $data['contact_number'] ?? null,
                 'address'        => $data['address'] ?? null,
+                'parent_name'    => $data['parent_name'] ?? null,
+                'parent_contact' => $data['parent_contact'] ?? null,
                 'boarding_house_id' => $data['boarding_house_id'] ?? null,
                 'boarding_approval_status' => !empty($data['boarding_house_id']) ? 'pending' : null,
             ]);
@@ -160,12 +177,7 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
-        // Notify all admins of the new pending account
-        User::where('role', 'admin')->each(function (User $admin) use ($user) {
-            Notification::createNewAccountRegistrationNotification($admin, $user);
-        });
-
-        if (!empty($data['boarding_house_id'])) {
+        if ($hasSelectedBoardingHouse) {
             $boardingHouse = BoardingHouse::with('owner.user')->find($data['boarding_house_id']);
             $ownerUser = $boardingHouse?->owner?->user;
 
@@ -182,12 +194,20 @@ class AuthController extends Controller
                     ],
                 ]);
             }
+        } else {
+            // Students without a selected boarding house still need admin account review.
+            User::where('role', 'admin')->each(function (User $admin) use ($user) {
+                Notification::createNewAccountRegistrationNotification($admin, $user);
+            });
         }
 
         // Return without token — account is pending, they must wait for approval
         return response()->json([
             'account_status' => 'pending',
-            'message'        => 'Your account has been submitted and is awaiting admin approval.',
+            'approval_reviewer' => $hasSelectedBoardingHouse ? 'owner' : 'admin',
+            'message'        => $hasSelectedBoardingHouse
+                ? 'Your account has been submitted and is awaiting boarding house owner approval.'
+                : 'Your account has been submitted and is awaiting admin approval.',
         ], 201);
     }
 

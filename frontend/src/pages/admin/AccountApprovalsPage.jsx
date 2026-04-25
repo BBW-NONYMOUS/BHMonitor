@@ -20,12 +20,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle, Clock, Eye, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Eye, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 
 const STATUS_BADGE = {
     pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
     approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 border-green-200' },
     rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border-red-200' },
+    declined: { label: 'Declined', cls: 'bg-red-50 text-red-700 border-red-200' },
 };
 
 function StatusPill({ status }) {
@@ -35,7 +36,7 @@ function StatusPill({ status }) {
         <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
             {status === 'pending' && <Clock className="h-3 w-3" />}
             {status === 'approved' && <CheckCircle className="h-3 w-3" />}
-            {status === 'rejected' && <XCircle className="h-3 w-3" />}
+            {(status === 'rejected' || status === 'declined') && <XCircle className="h-3 w-3" />}
             {badge.label}
         </span>
     );
@@ -52,6 +53,7 @@ export default function AccountApprovalsPage() {
     const [page, setPage] = useState(1);
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
+    const [markWarning, setMarkWarning] = useState(false);
     const [rejecting, setRejecting] = useState(false);
 
     const fetchAccounts = async () => {
@@ -90,10 +92,11 @@ export default function AccountApprovalsPage() {
         if (!rejectTarget) return;
         setRejecting(true);
         try {
-            await api.put(`/accounts/${rejectTarget.id}/reject`, { rejection_reason: rejectReason });
+            await api.put(`/accounts/${rejectTarget.id}/reject`, { rejection_reason: rejectReason, mark_warning: markWarning });
             toast.success(`${rejectTarget.name} rejected.`);
             setRejectTarget(null);
             setRejectReason('');
+            setMarkWarning(false);
             fetchAccounts();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to reject account.');
@@ -151,7 +154,11 @@ export default function AccountApprovalsPage() {
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
                                 <SelectItem value="approved">Approved</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
+                                {user?.role === 'owner' ? (
+                                    <SelectItem value="declined">Declined</SelectItem>
+                                ) : (
+                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                )}
                             </SelectContent>
                         </Select>
                         {user?.role === 'admin' && (
@@ -221,6 +228,12 @@ export default function AccountApprovalsPage() {
                                                         {account.boarding_rejection_comment}
                                                     </p>
                                                 )}
+                                                {(account.warnings_count > 0 || account.has_warning) && (
+                                                    <p className="mt-0.5 inline-flex max-w-44 items-center gap-1 truncate text-xs font-medium text-amber-600" title={account.warning_comment || 'Warning on profile'}>
+                                                        <AlertTriangle className="h-3 w-3" />
+                                                        {account.warnings_count || 1} {(account.warnings_count || 1) === 1 ? 'Warning' : 'Warnings'}
+                                                    </p>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-500">{account.created_at}</TableCell>
                                             <TableCell>
@@ -251,7 +264,7 @@ export default function AccountApprovalsPage() {
                                                             <CheckCircle className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    {reviewStatus !== 'rejected' && (
+                                                    {!['rejected', 'declined'].includes(reviewStatus) && (
                                                         <Button
                                                             size="icon"
                                                             variant="ghost"
@@ -260,6 +273,7 @@ export default function AccountApprovalsPage() {
                                                             onClick={() => {
                                                                 setRejectTarget(account);
                                                                 setRejectReason('');
+                                                                setMarkWarning(false);
                                                             }}
                                                         >
                                                             <XCircle className="h-4 w-4" />
@@ -307,7 +321,12 @@ export default function AccountApprovalsPage() {
                 </CardContent>
             </Card>
 
-            <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => !open && setRejectTarget(null)}>
+            <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => {
+                if (!open) {
+                    setRejectTarget(null);
+                    setMarkWarning(false);
+                }
+            }}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>Reject Account - {rejectTarget?.name}</DialogTitle>
@@ -321,6 +340,20 @@ export default function AccountApprovalsPage() {
                             value={rejectReason}
                             onChange={(event) => setRejectReason(event.target.value)}
                         />
+                        {user?.role === 'owner' && (
+                            <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                <input
+                                    type="checkbox"
+                                    checked={markWarning}
+                                    onChange={(event) => setMarkWarning(event.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-amber-300"
+                                />
+                                <span>
+                                    <span className="block font-medium">Mark student account with a warning</span>
+                                    <span className="text-xs text-amber-700">Use this when the rejection reason should be visible during future reviews.</span>
+                                </span>
+                            </label>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>

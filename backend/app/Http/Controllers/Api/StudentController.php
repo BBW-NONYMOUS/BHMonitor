@@ -10,6 +10,7 @@ use App\Models\Room;
 use App\Models\Student;
 use App\Models\StudentBoardingHistory;
 use App\Models\StudentInquiry;
+use App\Models\StudentWarning;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +20,8 @@ class StudentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
-        $query = Student::with(['user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room:id,room_name', 'inquiry:id,student_id,status']);
+        $query = Student::with(['user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room:id,room_name', 'inquiry:id,student_id,status', 'warningMarkedBy:id,name'])
+            ->withCount('warnings');
 
         if ($user->isOwner()) {
             $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
@@ -264,7 +266,20 @@ class StudentController extends Controller
             abort(403, 'You can only view your own student profile.');
         }
 
-        return response()->json($student->load('user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'boardingHouse.rooms', 'room'));
+        $relations = [
+            'user:id,email,account_status,rejection_reason,profile_photo',
+            'boardingHouse.owner',
+            'boardingHouse.rooms',
+            'room',
+            'warningMarkedBy:id,name',
+        ];
+
+        if (!$user->isStudent()) {
+            $relations[] = 'warnings.owner.user:id,name,email';
+            $student->loadCount('warnings');
+        }
+
+        return response()->json($student->load($relations));
     }
 
     public function update(Request $request, Student $student): JsonResponse
@@ -364,7 +379,7 @@ class StudentController extends Controller
             'created_at' => now(),
         ]);
 
-        return response()->json($student->load('user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room'));
+        return response()->json($student->load('user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room', 'warningMarkedBy:id,name'));
     }
 
     public function destroy(Request $request, Student $student): JsonResponse
@@ -453,7 +468,8 @@ class StudentController extends Controller
 
         $students = Student::whereIn('boarding_house_id', $bhIds)
             ->where('boarding_approval_status', 'pending')
-            ->with(['user:id,email,profile_photo', 'boardingHouse:id,boarding_name'])
+            ->with(['user:id,email,profile_photo', 'boardingHouse:id,boarding_name', 'warningMarkedBy:id,name'])
+            ->withCount('warnings')
             ->orderByDesc('created_at')
             ->paginate(15);
 
@@ -515,6 +531,7 @@ class StudentController extends Controller
     {
         $data = $request->validate([
             'rejection_comment' => 'nullable|string|max:500',
+            'mark_warning' => 'nullable|boolean',
         ]);
 
         $user = $request->user();
@@ -535,9 +552,16 @@ class StudentController extends Controller
             ], 422);
         }
 
+        $markWarning = (bool) ($data['mark_warning'] ?? false);
+        $rejectionComment = $data['rejection_comment'] ?? null;
+
         $student->update([
             'boarding_approval_status' => 'declined',
-            'boarding_rejection_comment' => $data['rejection_comment'] ?? null,
+            'boarding_rejection_comment' => $rejectionComment,
+            'has_warning' => $markWarning ? true : $student->has_warning,
+            'warning_comment' => $markWarning ? $rejectionComment : $student->warning_comment,
+            'warning_marked_by' => $markWarning ? $user->id : $student->warning_marked_by,
+            'warning_marked_at' => $markWarning ? now() : $student->warning_marked_at,
         ]);
 
         // Notify the student of decline
@@ -547,7 +571,7 @@ class StudentController extends Controller
                 'type'    => 'boarding_decline',
                 'title'   => 'Boarding House Application Declined',
                 'message' => "Your application for {$boardingHouse->boarding_name} has been declined." .
-                    ($data['rejection_comment'] ? " Reason: {$data['rejection_comment']}" : ""),
+                    ($rejectionComment ? " Reason: {$rejectionComment}" : ""),
                 'data'    => [
                     'student_id'        => $student->id,
                     'boarding_house_id' => $boardingHouse->id,
@@ -555,16 +579,70 @@ class StudentController extends Controller
             ]);
         }
 
+        if ($markWarning && $rejectionComment) {
+            StudentWarning::create([
+                'student_id' => $student->id,
+                'owner_id' => $user->owner?->id,
+                'boarding_house_name' => $boardingHouse->boarding_name,
+                'comment' => $rejectionComment,
+            ]);
+        }
+
         ActivityLog::create([
             'user_id'    => $user->id,
             'action'     => "Declined student {$student->full_name} for boarding at {$boardingHouse->boarding_name}." .
-                ($data['rejection_comment'] ? " Reason: {$data['rejection_comment']}" : ""),
+                ($rejectionComment ? " Reason: {$rejectionComment}" : "") .
+                ($markWarning ? " Warning marked." : ""),
             'created_at' => now(),
         ]);
 
         return response()->json([
             'message' => 'Student declined.',
-            'student' => $student->load('user:id,email,profile_photo', 'boardingHouse:id,boarding_name'),
+            'student' => $student->load('user:id,email,profile_photo', 'boardingHouse:id,boarding_name', 'warningMarkedBy:id,name'),
         ]);
+    }
+
+    public function addWarning(Request $request, Student $student): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            return response()->json(['message' => 'Only boarding house owners can add student warnings.'], 403);
+        }
+
+        $boardingHouse = $student->boardingHouse;
+        if (!$boardingHouse || $boardingHouse->owner_id !== $user->owner?->id) {
+            return response()->json(['message' => 'You can only add warnings for students registered to your boarding house.'], 403);
+        }
+
+        $data = $request->validate([
+            'comment' => 'required|string|max:1000',
+        ]);
+
+        $warning = StudentWarning::create([
+            'student_id' => $student->id,
+            'owner_id' => $user->owner?->id,
+            'boarding_house_name' => $boardingHouse->boarding_name,
+            'comment' => $data['comment'],
+        ]);
+
+        $student->update([
+            'has_warning' => true,
+            'warning_comment' => $data['comment'],
+            'warning_marked_by' => $user->id,
+            'warning_marked_at' => now(),
+        ]);
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => "Added a warning to student {$student->full_name}.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Warning added successfully.',
+            'warning' => $warning->load('owner.user:id,name,email'),
+            'warning_count' => $student->warnings()->count(),
+        ], 201);
     }
 }

@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, Search, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Eye, XCircle, Clock, Search, Loader2 } from 'lucide-react';
 
 export default function StudentApprovalsPage() {
   const { isOwner } = useAuth();
@@ -28,7 +28,7 @@ export default function StudentApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [processingId, setProcessingId] = useState(null);
-  const [declineModal, setDeclineModal] = useState({ open: false, studentId: null, reason: '' });
+  const [declineModal, setDeclineModal] = useState({ open: false, studentId: null, reason: '', markWarning: false });
 
   useEffect(() => {
     if (!isOwner()) {
@@ -66,7 +66,7 @@ export default function StudentApprovalsPage() {
   };
 
   const handleDeclineClick = (studentId) => {
-    setDeclineModal({ open: true, studentId, reason: '' });
+    setDeclineModal({ open: true, studentId, reason: '', markWarning: false });
   };
 
   const handleDeclineConfirm = async () => {
@@ -75,10 +75,11 @@ export default function StudentApprovalsPage() {
     try {
       await api.post(`/students/${studentId}/decline-boarding`, {
         rejection_comment: reason,
+        mark_warning: declineModal.markWarning,
       });
       toast.success('Student application declined');
       setStudents(students.filter(s => s.id !== studentId));
-      setDeclineModal({ open: false, studentId: null, reason: '' });
+      setDeclineModal({ open: false, studentId: null, reason: '', markWarning: false });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to decline student');
     } finally {
@@ -182,7 +183,7 @@ export default function StudentApprovalsPage() {
                       <div className="flex items-center gap-3">
                         {student.user?.profile_photo ? (
                           <img
-                            src={student.user.profile_photo}
+                            src={student.user.profile_photo.startsWith('/storage/') ? student.user.profile_photo : `/storage/${student.user.profile_photo}`}
                             alt={student.first_name}
                             className="h-12 w-12 rounded-full object-cover bg-slate-100"
                           />
@@ -200,6 +201,12 @@ export default function StudentApprovalsPage() {
                             ID: {student.student_no} • {student.course || 'N/A'} • {student.year_level || 'N/A'}
                           </p>
                           <p className="text-xs text-slate-400 mt-1">{student.user?.email}</p>
+                          {(student.warnings_count > 0 || student.has_warning) && (
+                            <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              {student.warnings_count || 1} {(student.warnings_count || 1) === 1 ? 'Warning' : 'Warnings'}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -216,6 +223,16 @@ export default function StudentApprovalsPage() {
                     </div>
 
                     <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/students/${student.id}`)}
+                        disabled={processingId === student.id}
+                        className="gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Profile
+                      </Button>
                       <Button
                         variant="default"
                         size="sm"
@@ -276,6 +293,18 @@ export default function StudentApprovalsPage() {
               maxLength={500}
             />
             <p className="text-xs text-slate-500">{declineModal.reason.length}/500</p>
+            <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <input
+                type="checkbox"
+                checked={declineModal.markWarning}
+                onChange={(e) => setDeclineModal({ ...declineModal, markWarning: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-amber-300"
+              />
+              <span>
+                <span className="block font-medium">Mark student account with a warning</span>
+                <span className="text-xs text-amber-700">Use this for behavior issues that admin and future boarding house owners should review.</span>
+              </span>
+            </label>
           </div>
 
           <div className="flex gap-3 justify-end">

@@ -105,5 +105,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $boardingHouse->syncRoomCounts();
+
+        $this->call(StudentSeeder::class);
     }
 }
