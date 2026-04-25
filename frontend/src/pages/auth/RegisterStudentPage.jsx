@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/services/api';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,13 @@ export default function RegisterStudentPage() {
         student_no: '', first_name: '', last_name: '',
         email: '', password: '', password_confirmation: '',
         gender: '', course: '', year_level: '', contact_number: '', address: '',
+        boarding_house_id: '',
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
     const [registered, setRegistered] = useState(false);
+    const [boardingHouses, setBoardingHouses] = useState([]);
+    const [boardingHousesLoading, setBoardingHousesLoading] = useState(false);
     const photoInputRef = useRef(null);
 
     // Pre-fill from Google OAuth redirect (?email=...&name=...)
@@ -39,6 +43,28 @@ export default function RegisterStudentPage() {
             }));
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        let active = true;
+        setBoardingHousesLoading(true);
+
+        api.get('/find-boarding?per_page=100')
+            .then(({ data }) => {
+                if (!active) return;
+                setBoardingHouses(data?.data || []);
+            })
+            .catch(() => {
+                if (active) toast.error('Failed to load registered boarding houses.');
+            })
+            .finally(() => {
+                if (active) setBoardingHousesLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
     // Profile photo state - REQ-002
     const [profilePhoto, setProfilePhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
@@ -113,7 +139,15 @@ export default function RegisterStudentPage() {
                 Object.entries(form).forEach(([k, v]) => { if (v !== '') payload.append(k, v); });
                 payload.append('profile_photo', profilePhoto);
             } else {
-                payload = form;
+                payload = {
+                    ...form,
+                    boarding_house_id: form.boarding_house_id || null,
+                    gender: form.gender || null,
+                    year_level: form.year_level || null,
+                    course: form.course || null,
+                    address: form.address || null,
+                    contact_number: form.contact_number || null,
+                };
             }
 
             await registerStudent(payload);
@@ -317,6 +351,27 @@ export default function RegisterStudentPage() {
                                 <div className="space-y-1">
                                     <Label>Home Address</Label>
                                     <Input placeholder="Purok, Barangay, Municipality" value={form.address} onChange={set('address')} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Registered BH for Reservation</Label>
+                                    <Select
+                                        value={String(form.boarding_house_id || '')}
+                                        onValueChange={(value) => setForm(p => ({ ...p, boarding_house_id: value === 'none' ? '' : value }))}
+                                        disabled={boardingHousesLoading}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={boardingHousesLoading ? 'Loading boarding houses...' : 'Select boarding house'} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No reservation yet</SelectItem>
+                                            {boardingHouses.map(bh => (
+                                                <SelectItem key={bh.id} value={String(bh.id)}>
+                                                    {bh.boarding_name}{bh.address ? ` - ${bh.address}` : ''}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.boarding_house_id && <p className="text-xs text-red-500">{errors.boarding_house_id[0]}</p>}
                                 </div>
                             </div>
 

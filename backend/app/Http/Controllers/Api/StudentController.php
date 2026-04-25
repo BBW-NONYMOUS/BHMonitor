@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\BoardingHouse;
+use App\Models\Notification;
 use App\Models\Room;
 use App\Models\Student;
 use App\Models\StudentBoardingHistory;
@@ -18,7 +19,7 @@ class StudentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
-        $query = Student::with(['boardingHouse.owner', 'room:id,room_name', 'inquiry:id,student_id,status']);
+        $query = Student::with(['user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room:id,room_name', 'inquiry:id,student_id,status']);
 
         if ($user->isOwner()) {
             $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
@@ -255,9 +256,15 @@ class StudentController extends Controller
         return response()->json($student->load('boardingHouse', 'room'), 201);
     }
 
-    public function show(Student $student): JsonResponse
+    public function show(Request $request, Student $student): JsonResponse
     {
-        return response()->json($student->load('boardingHouse.owner', 'boardingHouse.rooms', 'room'));
+        $user = $request->user();
+
+        if ($user->isStudent() && (int) $student->user_id !== (int) $user->id) {
+            abort(403, 'You can only view your own student profile.');
+        }
+
+        return response()->json($student->load('user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'boardingHouse.rooms', 'room'));
     }
 
     public function update(Request $request, Student $student): JsonResponse
@@ -266,6 +273,10 @@ class StudentController extends Controller
 
         // Students cannot change their own student_no
         if ($user->isStudent()) {
+            if ((int) $student->user_id !== (int) $user->id) {
+                abort(403, 'You can only update your own student profile.');
+            }
+
             $data = $request->validate([
                 'first_name'     => 'sometimes|string|max:255',
                 'last_name'      => 'sometimes|string|max:255',
@@ -276,6 +287,7 @@ class StudentController extends Controller
                 'address'        => 'nullable|string|max:500',
                 'parent_name'    => 'nullable|string|max:255',
                 'parent_contact' => 'nullable|string|max:20',
+                'boarding_house_id' => 'nullable|exists:boarding_houses,id',
             ]);
             // Explicitly exclude student_no
             unset($data['student_no']);
@@ -305,7 +317,31 @@ class StudentController extends Controller
         $oldBhId = $student->boarding_house_id;
         $newBhId = $data['boarding_house_id'] ?? $student->boarding_house_id;
 
+        if ($user->isStudent() && (int) $oldBhId !== (int) $newBhId) {
+            $data['boarding_approval_status'] = $newBhId ? 'pending' : null;
+            $data['boarding_rejection_comment'] = null;
+            $data['room_id'] = null;
+        }
+
         $student->update($data);
+
+        // Notify the new boarding house owner when a student changes their boarding house
+        if ($user->isStudent() && $newBhId && (int) $oldBhId !== (int) $newBhId) {
+            $boardingHouse = BoardingHouse::with('owner.user')->find($newBhId);
+            $ownerUser = $boardingHouse?->owner?->user;
+            if ($ownerUser) {
+                Notification::create([
+                    'user_id' => $ownerUser->id,
+                    'type'    => 'new_student_registration',
+                    'title'   => 'Student Updated Boarding House',
+                    'message' => "{$student->first_name} {$student->last_name} selected {$boardingHouse->boarding_name} and needs your review.",
+                    'data'    => [
+                        'student_id'        => $student->id,
+                        'boarding_house_id' => $newBhId,
+                    ],
+                ]);
+            }
+        }
 
         if (isset($data['boarding_house_id']) && $oldBhId !== $newBhId) {
             if ($oldBhId) {
@@ -328,7 +364,7 @@ class StudentController extends Controller
             'created_at' => now(),
         ]);
 
-        return response()->json($student->load('boardingHouse', 'room'));
+        return response()->json($student->load('user:id,email,account_status,rejection_reason,profile_photo', 'boardingHouse.owner', 'room'));
     }
 
     public function destroy(Request $request, Student $student): JsonResponse
@@ -403,5 +439,132 @@ class StudentController extends Controller
         return response()->json(
             $student->boardingHistories()->with('boardingHouse:id,boarding_name,address')->get()
         );
+    }
+
+    public function pendingApprovals(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            return response()->json(['message' => 'Only owners can view pending approvals'], 403);
+        }
+
+        $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
+
+        $students = Student::whereIn('boarding_house_id', $bhIds)
+            ->where('boarding_approval_status', 'pending')
+            ->with(['user:id,email,profile_photo', 'boardingHouse:id,boarding_name'])
+            ->orderByDesc('created_at')
+            ->paginate(15);
+
+        return response()->json($students);
+    }
+
+    public function approveBoardingStudent(Request $request, Student $student): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            return response()->json(['message' => 'Only owners can approve students'], 403);
+        }
+
+        // Check authorization: owner can only approve students in their boarding houses
+        $boardingHouse = $student->boardingHouse;
+        if (!$boardingHouse || $boardingHouse->owner_id !== $user->owner?->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($student->boarding_approval_status !== 'pending') {
+            return response()->json([
+                'message' => "Student already has approval status: {$student->boarding_approval_status}"
+            ], 422);
+        }
+
+        $student->update([
+            'boarding_approval_status' => 'approved',
+            'boarding_rejection_comment' => null,
+        ]);
+
+        // Notify the student of approval
+        if ($student->user) {
+            Notification::create([
+                'user_id' => $student->user_id,
+                'type'    => 'boarding_approval',
+                'title'   => 'Boarding House Application Approved',
+                'message' => "Your application for {$boardingHouse->boarding_name} has been approved!",
+                'data'    => [
+                    'student_id'        => $student->id,
+                    'boarding_house_id' => $boardingHouse->id,
+                ],
+            ]);
+        }
+
+        ActivityLog::create([
+            'user_id'    => $user->id,
+            'action'     => "Approved student {$student->full_name} for boarding at {$boardingHouse->boarding_name}.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Student approved successfully.',
+            'student' => $student->load('user:id,email,profile_photo', 'boardingHouse:id,boarding_name'),
+        ]);
+    }
+
+    public function declineBoardingStudent(Request $request, Student $student): JsonResponse
+    {
+        $data = $request->validate([
+            'rejection_comment' => 'nullable|string|max:500',
+        ]);
+
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            return response()->json(['message' => 'Only owners can decline students'], 403);
+        }
+
+        // Check authorization: owner can only decline students in their boarding houses
+        $boardingHouse = $student->boardingHouse;
+        if (!$boardingHouse || $boardingHouse->owner_id !== $user->owner?->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($student->boarding_approval_status !== 'pending') {
+            return response()->json([
+                'message' => "Student already has approval status: {$student->boarding_approval_status}"
+            ], 422);
+        }
+
+        $student->update([
+            'boarding_approval_status' => 'declined',
+            'boarding_rejection_comment' => $data['rejection_comment'] ?? null,
+        ]);
+
+        // Notify the student of decline
+        if ($student->user) {
+            Notification::create([
+                'user_id' => $student->user_id,
+                'type'    => 'boarding_decline',
+                'title'   => 'Boarding House Application Declined',
+                'message' => "Your application for {$boardingHouse->boarding_name} has been declined." .
+                    ($data['rejection_comment'] ? " Reason: {$data['rejection_comment']}" : ""),
+                'data'    => [
+                    'student_id'        => $student->id,
+                    'boarding_house_id' => $boardingHouse->id,
+                ],
+            ]);
+        }
+
+        ActivityLog::create([
+            'user_id'    => $user->id,
+            'action'     => "Declined student {$student->full_name} for boarding at {$boardingHouse->boarding_name}." .
+                ($data['rejection_comment'] ? " Reason: {$data['rejection_comment']}" : ""),
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Student declined.',
+            'student' => $student->load('user:id,email,profile_photo', 'boardingHouse:id,boarding_name'),
+        ]);
     }
 }

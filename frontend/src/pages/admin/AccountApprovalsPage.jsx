@@ -1,23 +1,48 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '@/services/api';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Trash2, Search, Clock, ShieldCheck } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { CheckCircle, Clock, Eye, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 
 const STATUS_BADGE = {
-    pending:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
     approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 border-green-200' },
     rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border-red-200' },
 };
 
+function StatusPill({ status }) {
+    const badge = STATUS_BADGE[status] ?? STATUS_BADGE.pending;
+
+    return (
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
+            {status === 'pending' && <Clock className="h-3 w-3" />}
+            {status === 'approved' && <CheckCircle className="h-3 w-3" />}
+            {status === 'rejected' && <XCircle className="h-3 w-3" />}
+            {badge.label}
+        </span>
+    );
+}
+
 export default function AccountApprovalsPage() {
+    const { user } = useAuth();
     const [accounts, setAccounts] = useState([]);
     const [meta, setMeta] = useState({});
     const [loading, setLoading] = useState(true);
@@ -25,7 +50,6 @@ export default function AccountApprovalsPage() {
     const [statusFilter, setStatusFilter] = useState('pending');
     const [roleFilter, setRoleFilter] = useState('');
     const [page, setPage] = useState(1);
-    // Reject dialog
     const [rejectTarget, setRejectTarget] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
     const [rejecting, setRejecting] = useState(false);
@@ -34,21 +58,32 @@ export default function AccountApprovalsPage() {
         setLoading(true);
         try {
             const { data } = await api.get('/accounts', {
-                params: { status: statusFilter || undefined, role: roleFilter || undefined, search: search || undefined, page }
+                params: {
+                    status: statusFilter || undefined,
+                    role: roleFilter || undefined,
+                    search: search || undefined,
+                    page,
+                },
             });
-            setAccounts(data.data);
+            setAccounts(data.data || []);
             setMeta({ current_page: data.current_page, last_page: data.last_page, total: data.total });
-        } finally { setLoading(false); }
+        } finally {
+            setLoading(false);
+        }
     };
 
-    useEffect(() => { fetchAccounts(); }, [statusFilter, roleFilter, search, page]);
+    useEffect(() => {
+        fetchAccounts();
+    }, [statusFilter, roleFilter, search, page]);
 
-    const handleApprove = async (user) => {
+    const handleApprove = async (account) => {
         try {
-            await api.put(`/accounts/${user.id}/approve`);
-            toast.success(`${user.name} approved.`);
+            await api.put(`/accounts/${account.id}/approve`);
+            toast.success(`${account.name} approved.`);
             fetchAccounts();
-        } catch { toast.error('Failed to approve account.'); }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to approve account.');
+        }
     };
 
     const handleReject = async () => {
@@ -60,25 +95,34 @@ export default function AccountApprovalsPage() {
             setRejectTarget(null);
             setRejectReason('');
             fetchAccounts();
-        } catch { toast.error('Failed to reject account.'); }
-        finally { setRejecting(false); }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to reject account.');
+        } finally {
+            setRejecting(false);
+        }
     };
 
-    const handleDelete = async (user) => {
+    const handleDelete = async (account) => {
         try {
-            await api.delete(`/accounts/${user.id}`);
-            toast.success(`Account for ${user.name} deleted.`);
+            await api.delete(`/accounts/${account.id}`);
+            toast.success(`Account for ${account.name} deleted.`);
             fetchAccounts();
-        } catch { toast.error('Failed to delete account.'); }
+        } catch {
+            toast.error('Failed to delete account.');
+        }
     };
 
     return (
         <div className="space-y-4">
             <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
+                <h1 className="flex items-center gap-2 text-2xl font-bold">
                     <ShieldCheck className="h-6 w-6 text-blue-600" /> Account Approvals
                 </h1>
-                <p className="text-sm text-slate-500">Approve or reject student and boarding house owner registrations.</p>
+                <p className="text-sm text-slate-500">
+                    {user?.role === 'owner'
+                        ? 'Approve or reject students registered to your boarding house.'
+                        : 'Approve or reject student and boarding house owner registrations.'}
+                </p>
             </div>
 
             <Card>
@@ -90,10 +134,16 @@ export default function AccountApprovalsPage() {
                                 placeholder="Search by name or email..."
                                 className="pl-9"
                                 value={search}
-                                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                                onChange={(event) => {
+                                    setSearch(event.target.value);
+                                    setPage(1);
+                                }}
                             />
                         </div>
-                        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v === 'all' ? '' : v); setPage(1); }}>
+                        <Select value={statusFilter} onValueChange={(value) => {
+                            setStatusFilter(value === 'all' ? '' : value);
+                            setPage(1);
+                        }}>
                             <SelectTrigger className="w-full md:w-36">
                                 <SelectValue placeholder="All Status" />
                             </SelectTrigger>
@@ -104,16 +154,21 @@ export default function AccountApprovalsPage() {
                                 <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Select value={roleFilter} onValueChange={v => { setRoleFilter(v === 'all' ? '' : v); setPage(1); }}>
-                            <SelectTrigger className="w-full md:w-36">
-                                <SelectValue placeholder="All Roles" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Roles</SelectItem>
-                                <SelectItem value="student">Student</SelectItem>
-                                <SelectItem value="owner">BH Owner</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {user?.role === 'admin' && (
+                            <Select value={roleFilter} onValueChange={(value) => {
+                                setRoleFilter(value === 'all' ? '' : value);
+                                setPage(1);
+                            }}>
+                                <SelectTrigger className="w-full md:w-36">
+                                    <SelectValue placeholder="All Roles" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Roles</SelectItem>
+                                    <SelectItem value="student">Student</SelectItem>
+                                    <SelectItem value="owner">BH Owner</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
                 </CardHeader>
 
@@ -130,6 +185,7 @@ export default function AccountApprovalsPage() {
                                     <TableHead>Email</TableHead>
                                     <TableHead>Role</TableHead>
                                     <TableHead>Student ID / Owner</TableHead>
+                                    <TableHead>Boarding House</TableHead>
                                     <TableHead>Registered</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -138,79 +194,98 @@ export default function AccountApprovalsPage() {
                             <TableBody>
                                 {accounts.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400">
+                                        <TableCell colSpan={8} className="py-10 text-center text-slate-400">
                                             No accounts found.
                                         </TableCell>
                                     </TableRow>
-                                ) : accounts.map(acc => {
-                                    const badge = STATUS_BADGE[acc.account_status] ?? STATUS_BADGE.pending;
+                                ) : accounts.map((account) => {
+                                    const reviewStatus = user?.role === 'owner'
+                                        ? account.boarding_approval_status
+                                        : account.account_status;
                                     return (
-                                        <TableRow key={acc.id}>
-                                            <TableCell className="font-medium">{acc.name}</TableCell>
-                                            <TableCell className="text-sm text-slate-500">{acc.email}</TableCell>
+                                        <TableRow key={account.id}>
+                                            <TableCell className="font-medium">{account.name}</TableCell>
+                                            <TableCell className="text-sm text-slate-500">{account.email}</TableCell>
                                             <TableCell>
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize border ${acc.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200'}`}>
-                                                    {acc.role}
+                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${account.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200'}`}>
+                                                    {account.role}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-500">
-                                                {acc.student_no || acc.owner_name || '—'}
+                                                {account.student_no || account.owner_name || '-'}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-500">{acc.created_at}</TableCell>
+                                            <TableCell className="text-sm text-slate-500">
+                                                {account.boarding_house || '-'}
+                                                {account.boarding_rejection_comment && (
+                                                    <p className="mt-0.5 max-w-44 truncate text-xs text-red-500" title={account.boarding_rejection_comment}>
+                                                        {account.boarding_rejection_comment}
+                                                    </p>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-slate-500">{account.created_at}</TableCell>
                                             <TableCell>
-                                                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
-                                                    {acc.account_status === 'pending'  && <Clock className="h-3 w-3" />}
-                                                    {acc.account_status === 'approved' && <CheckCircle className="h-3 w-3" />}
-                                                    {acc.account_status === 'rejected' && <XCircle className="h-3 w-3" />}
-                                                    {badge.label}
-                                                </span>
-                                                {acc.rejection_reason && (
-                                                    <p className="text-xs text-slate-400 mt-0.5 max-w-[160px] truncate" title={acc.rejection_reason}>
-                                                        {acc.rejection_reason}
+                                                <StatusPill status={reviewStatus} />
+                                                {account.rejection_reason && user?.role === 'admin' && (
+                                                    <p className="mt-0.5 max-w-40 truncate text-xs text-slate-400" title={account.rejection_reason}>
+                                                        {account.rejection_reason}
                                                     </p>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {acc.account_status !== 'approved' && (
+                                                    {account.student_id && (
+                                                        <Link to={`/students/${account.student_id}`}>
+                                                            <Button size="icon" variant="ghost" title="View profile">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </Link>
+                                                    )}
+                                                    {reviewStatus !== 'approved' && (
                                                         <Button
-                                                            size="icon" variant="ghost"
+                                                            size="icon"
+                                                            variant="ghost"
                                                             className="text-green-600 hover:bg-green-50"
                                                             title="Approve"
-                                                            onClick={() => handleApprove(acc)}
+                                                            onClick={() => handleApprove(account)}
                                                         >
                                                             <CheckCircle className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    {acc.account_status !== 'rejected' && (
+                                                    {reviewStatus !== 'rejected' && (
                                                         <Button
-                                                            size="icon" variant="ghost"
+                                                            size="icon"
+                                                            variant="ghost"
                                                             className="text-red-500 hover:bg-red-50"
                                                             title="Reject"
-                                                            onClick={() => { setRejectTarget(acc); setRejectReason(''); }}
+                                                            onClick={() => {
+                                                                setRejectTarget(account);
+                                                                setRejectReason('');
+                                                            }}
                                                         >
                                                             <XCircle className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <Button size="icon" variant="ghost" className="text-slate-400 hover:text-red-600 hover:bg-red-50" title="Delete account">
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Delete Account?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    This will permanently delete <strong>{acc.name}</strong>'s account and cannot be undone.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDelete(acc)}>Delete</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
+                                                    {user?.role === 'admin' && (
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="text-slate-400 hover:bg-red-50 hover:text-red-600" title="Delete account">
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This will permanently delete <strong>{account.name}</strong>'s account and cannot be undone.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDelete(account)}>Delete</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -222,31 +297,30 @@ export default function AccountApprovalsPage() {
 
                     {meta.last_page > 1 && (
                         <div className="flex items-center justify-between border-t px-4 py-3">
-                            <p className="text-sm text-slate-500">Page {meta.current_page} of {meta.last_page} — {meta.total} total</p>
+                            <p className="text-sm text-slate-500">Page {meta.current_page} of {meta.last_page} - {meta.total} total</p>
                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
-                                <Button variant="outline" size="sm" disabled={page >= meta.last_page} onClick={() => setPage(p => p + 1)}>Next</Button>
+                                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Prev</Button>
+                                <Button variant="outline" size="sm" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
                             </div>
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {/* Reject with Reason Dialog */}
-            <Dialog open={!!rejectTarget} onOpenChange={v => !v && setRejectTarget(null)}>
+            <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => !open && setRejectTarget(null)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Reject Account — {rejectTarget?.name}</DialogTitle>
+                        <DialogTitle>Reject Account - {rejectTarget?.name}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                        <p className="text-sm text-slate-500">Provide an optional reason. The user will see this message when they try to log in.</p>
-                        <div className="space-y-1">
-                            <Input
-                                placeholder="Reason for rejection (optional)"
-                                value={rejectReason}
-                                onChange={e => setRejectReason(e.target.value)}
-                            />
-                        </div>
+                        <p className="text-sm text-slate-500">
+                            Add a comment explaining the rejection. The student and future reviewers can see this note.
+                        </p>
+                        <Input
+                            placeholder="Reason or warning comment"
+                            value={rejectReason}
+                            onChange={(event) => setRejectReason(event.target.value)}
+                        />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>

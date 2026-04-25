@@ -32,6 +32,7 @@ export default function StudentViewPage() {
     }
 
     const bh = student.boarding_house;
+    const photoUrl = student.user?.profile_photo ? `/storage/${student.user.profile_photo}` : null;
 
     return (
         <div className="mx-auto max-w-3xl space-y-4">
@@ -40,8 +41,14 @@ export default function StudentViewPage() {
                     <Link to="/students">
                         <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
                     </Link>
+                    {photoUrl && (
+                        <img src={photoUrl} alt={`${student.first_name} ${student.last_name}`} className="h-12 w-12 rounded-full object-cover ring-2 ring-green-200" />
+                    )}
                     <h1 className="text-2xl font-bold">{student.first_name} {student.last_name}</h1>
                     <Badge variant="secondary" className="font-mono">{student.student_no}</Badge>
+                    {student.boarding_approval_status && (
+                        <Badge variant="outline" className="capitalize">{student.boarding_approval_status}</Badge>
+                    )}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Link to={`/students/${id}/assign`} className="w-full sm:w-auto">
@@ -57,12 +64,15 @@ export default function StudentViewPage() {
                 <Card>
                     <CardHeader><CardTitle className="text-base">Personal Information</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Field label="Email" value={student.user?.email} />
                         <Field label="Gender" value={student.gender} />
                         <Field label="Contact" value={student.contact_number} />
+                        <Field label="Home Address" value={student.address} />
                         <Field label="Course" value={student.course} />
                         <Field label="Year Level" value={student.year_level} />
                         <Field label="Parent / Guardian" value={student.parent_name} />
                         <Field label="Parent Contact" value={student.parent_contact} />
+                        <Field label="Account Status" value={student.user?.account_status} />
                     </CardContent>
                 </Card>
 
@@ -76,6 +86,8 @@ export default function StudentViewPage() {
                                 </div>
                                 <Field label="Boarding House" value={bh.boarding_name} />
                                 <Field label="Address" value={bh.address} />
+                                <Field label="Owner" value={bh.owner?.full_name} />
+                                <Field label="Approval Status" value={student.boarding_approval_status} />
                                 <Field label="Room Rate" value={bh.room_rate ? `P${Number(bh.room_rate).toLocaleString()}/mo` : null} />
                                 <Link to={`/boarding-houses/${bh.id}`} className="inline-flex w-full sm:w-auto">
                                     <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto">View Boarding House</Button>
@@ -93,6 +105,16 @@ export default function StudentViewPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {(student.boarding_rejection_comment || student.user?.rejection_reason) && (
+                <Card className="border-red-200 bg-red-50">
+                    <CardHeader><CardTitle className="text-base text-red-800">Review Comment</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm text-red-700">
+                        {student.boarding_rejection_comment && <p>{student.boarding_rejection_comment}</p>}
+                        {student.user?.rejection_reason && <p>{student.user.rejection_reason}</p>}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

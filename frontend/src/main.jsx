@@ -14,6 +14,7 @@ import RegisterStudentPage from '@/pages/auth/RegisterStudentPage';
 import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage';
 import StudentDashboardPage from '@/pages/students/StudentDashboardPage';
 import StudentDocumentsPage from '@/pages/students/StudentDocumentsPage';
+import StudentSettingsPage from '@/pages/students/StudentSettingsPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import StudentsPage from '@/pages/students/StudentsPage';
 import StudentFormPage from '@/pages/students/StudentFormPage';
@@ -29,6 +30,7 @@ import BoardingHouseFormPage from '@/pages/boarding-houses/BoardingHouseFormPage
 import BoardingHouseViewPage from '@/pages/boarding-houses/BoardingHouseViewPage';
 import RoomsPage from '@/pages/boarding-houses/RoomsPage';
 import MapPage from '@/pages/boarding-houses/MapPage';
+import StudentApprovalsPage from '@/pages/boarding-houses/StudentApprovalsPage';
 import OwnersPage from '@/pages/owners/OwnersPage';
 import OwnerFormPage from '@/pages/owners/OwnerFormPage';
 import AccountApprovalsPage from '@/pages/admin/AccountApprovalsPage';
@@ -124,6 +126,7 @@ function App() {
                     <Route path="boarding-houses/:id/rooms" element={<RoomsPage />} />
                     <Route path="boarding-houses/:id/inquiries" element={<AdminOwnerRoute><InquiriesPage /></AdminOwnerRoute>} />
                     <Route path="boarding-houses/map" element={<MapPage />} />
+                    <Route path="student-approvals" element={<OwnerRoute><StudentApprovalsPage /></OwnerRoute>} />
 
                     {/* Reservations — admin and owner */}
                     <Route path="inquiries" element={<AdminOwnerRoute><AllInquiriesPage /></AdminOwnerRoute>} />
@@ -136,7 +139,7 @@ function App() {
                     <Route path="owners/:id/edit" element={<AdminRoute><OwnerFormPage /></AdminRoute>} />
 
                     {/* Admin-only tools */}
-                    <Route path="accounts" element={<AdminRoute><AccountApprovalsPage /></AdminRoute>} />
+                    <Route path="accounts" element={<AdminOwnerRoute><AccountApprovalsPage /></AdminOwnerRoute>} />
                     <Route path="backup" element={<AdminRoute><BackupRestorePage /></AdminRoute>} />
                     <Route path="settings" element={<AdminOwnerRoute><SettingsPage /></AdminOwnerRoute>} />
 
@@ -152,6 +155,7 @@ function App() {
                     <Route path="student-dashboard" element={<StudentDashboardPage />} />
                     <Route path="student-documents" element={<StudentDocumentsPage />} />
                     <Route path="student-reservations" element={<StudentReservationsPage />} />
+                    <Route path="student-settings" element={<StudentSettingsPage />} />
                 </Route>
 
                 {/* Fallback */}

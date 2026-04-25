@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AccountApproved;
 use App\Mail\AccountRejected;
 use App\Models\ActivityLog;
+use App\Models\BoardingHouse;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Mail;
 class AccountController extends Controller
 {
     /**
-     * List all accounts (student and owner) — admin only
+     * List all accounts — admin sees owners, owners see students
      */
     public function index(Request $request): JsonResponse
     {
@@ -23,13 +24,33 @@ class AccountController extends Controller
         $role   = $request->input('role');
         $search = $request->input('search');
 
-        $query = User::with(['owner', 'student'])
-            ->whereIn('role', ['student', 'owner']);
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->isOwner()) {
+            abort(403, 'Unauthorized.');
+        }
 
-        if ($status) {
+        $query = User::with(['owner', 'student.boardingHouse']);
+
+        // Admin sees only OWNER accounts
+        if ($user->isAdmin()) {
+            $query->where('role', 'owner');
+        }
+        // Owners see only STUDENT accounts from their boarding houses
+        elseif ($user->isOwner()) {
+            $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
+            $query->where('role', 'student')
+                ->whereHas('student', function ($q) use ($bhIds, $status) {
+                    $q->whereIn('boarding_house_id', $bhIds);
+                    if ($status) {
+                        $q->where('boarding_approval_status', $status);
+                    }
+                });
+        }
+
+        if ($status && $user->isAdmin()) {
             $query->where('account_status', $status);
         }
-        if ($role) {
+        if ($role && $user->isAdmin()) {
             $query->where('role', $role);
         }
         if ($search) {
@@ -43,29 +64,53 @@ class AccountController extends Controller
                           ->orderByDesc('created_at')
                           ->paginate(15);
 
+        $accounts->setCollection(
+            $accounts->getCollection()->map(fn (User $account) => $this->payload($account))
+        );
+
         return response()->json($accounts);
     }
 
     /**
-     * Approve a user account — admin only
+     * Approve a user account — admin approves owners, owners approve students
      */
     public function approve(Request $request, User $user): JsonResponse
     {
+        $actor = $request->user();
+        if (!$actor->isAdmin() && !$actor->isOwner()) {
+            abort(403, 'Unauthorized.');
+        }
+
         if ($user->isAdmin()) {
             return response()->json(['message' => 'Cannot modify admin accounts.'], 403);
         }
 
-        $user->update([
-            'account_status'   => 'approved',
-            'rejection_reason' => null,
-        ]);
+        // Admin can only approve owners
+        if ($actor->isAdmin()) {
+            if (!$user->isOwner()) {
+                return response()->json(['message' => 'Only admins can approve owner accounts.'], 403);
+            }
+            $user->update([
+                'account_status'   => 'approved',
+                'rejection_reason' => null,
+            ]);
+        }
+        // Owners can only approve their students
+        elseif ($actor->isOwner()) {
+            $this->authorizeOwnerStudent($actor, $user);
+
+            $user->student?->update([
+                'boarding_approval_status' => 'approved',
+                'boarding_rejection_comment' => null,
+            ]);
+        }
 
         Mail::to($user->email)->send(new AccountApproved($user));
 
         Notification::createAccountStatusNotification($user, 'approved');
 
         ActivityLog::create([
-            'user_id'    => $request->user()->id,
+            'user_id'    => $actor->id,
             'action'     => "Approved account for {$user->name} ({$user->role}).",
             'created_at' => now(),
         ]);
@@ -77,10 +122,15 @@ class AccountController extends Controller
     }
 
     /**
-     * Reject a user account — admin only
+     * Reject a user account — admin rejects owners, owners reject students
      */
     public function reject(Request $request, User $user): JsonResponse
     {
+        $actor = $request->user();
+        if (!$actor->isAdmin() && !$actor->isOwner()) {
+            abort(403, 'Unauthorized.');
+        }
+
         if ($user->isAdmin()) {
             return response()->json(['message' => 'Cannot modify admin accounts.'], 403);
         }
@@ -91,20 +141,43 @@ class AccountController extends Controller
 
         $rejectionReason = $data['rejection_reason'] ?? null;
 
-        $user->update([
-            'account_status'   => 'rejected',
-            'rejection_reason' => $rejectionReason,
-        ]);
+        // Admin can only reject owners
+        if ($actor->isAdmin()) {
+            if (!$user->isOwner()) {
+                return response()->json(['message' => 'Only admins can reject owner accounts.'], 403);
+            }
+            $user->update([
+                'account_status'   => 'rejected',
+                'rejection_reason' => $rejectionReason,
+            ]);
+
+            // Revoke all tokens so they cannot use any existing sessions
+            $user->tokens()->delete();
+        }
+        // Owners can only reject their students
+        elseif ($actor->isOwner()) {
+            $this->authorizeOwnerStudent($actor, $user);
+
+            $user->student?->update([
+                'boarding_approval_status' => 'rejected',
+                'boarding_rejection_comment' => $rejectionReason,
+            ]);
+
+            if ($user->account_status === 'pending') {
+                $user->update([
+                    'account_status'   => 'rejected',
+                    'rejection_reason' => $rejectionReason,
+                ]);
+                $user->tokens()->delete();
+            }
+        }
 
         Mail::to($user->email)->send(new AccountRejected($user, $rejectionReason));
 
         Notification::createAccountStatusNotification($user, 'rejected', $rejectionReason);
 
-        // Revoke all tokens so they cannot use any existing sessions
-        $user->tokens()->delete();
-
         ActivityLog::create([
-            'user_id'    => $request->user()->id,
+            'user_id'    => $actor->id,
             'action'     => "Rejected account for {$user->name} ({$user->role}).",
             'created_at' => now(),
         ]);
@@ -140,17 +213,33 @@ class AccountController extends Controller
     /**
      * Pending accounts count — for dashboard badge
      */
-    public function pendingCount(): JsonResponse
+    public function pendingCount(Request $request): JsonResponse
     {
-        $count = User::whereIn('role', ['student', 'owner'])
-                     ->where('account_status', 'pending')
-                     ->count();
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->isOwner()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        if ($user->isOwner()) {
+            // Owners see pending student approvals for their boarding houses
+            $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
+            $count = User::where('role', 'student')
+                ->whereHas('student', fn ($q) => $q->whereIn('boarding_house_id', $bhIds)->where('boarding_approval_status', 'pending'))
+                ->count();
+        } else {
+            // Admins see pending OWNER account approvals only
+            $count = User::where('role', 'owner')
+                         ->where('account_status', 'pending')
+                         ->count();
+        }
 
         return response()->json(['pending_accounts' => $count]);
     }
 
     private function payload(User $user): array
     {
+        $user->loadMissing('student.boardingHouse', 'owner');
+
         return [
             'id'               => $user->id,
             'name'             => $user->name,
@@ -160,7 +249,26 @@ class AccountController extends Controller
             'rejection_reason' => $user->rejection_reason,
             'created_at'       => $user->created_at?->format('M d, Y'),
             'student_no'       => $user->student?->student_no,
+            'student_id'       => $user->student?->id,
             'owner_name'       => $user->owner?->full_name,
+            'boarding_house'   => $user->student?->boardingHouse?->boarding_name,
+            'boarding_approval_status' => $user->student?->boarding_approval_status,
+            'boarding_rejection_comment' => $user->student?->boarding_rejection_comment,
         ];
+    }
+
+    private function authorizeOwnerStudent(User $ownerUser, User $studentUser): void
+    {
+        if (!$studentUser->isStudent() || !$studentUser->student) {
+            abort(403, 'Owners can only review student accounts.');
+        }
+
+        $ownsBoardingHouse = $ownerUser->owner
+            ? $ownerUser->owner->boardingHouses()->where('id', $studentUser->student->boarding_house_id)->exists()
+            : false;
+
+        if (!$ownsBoardingHouse) {
+            abort(403, 'You can only review students registered to your boarding house.');
+        }
     }
 }

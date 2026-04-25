@@ -75,7 +75,7 @@ export default function LandingPage() {
                         <Link to="/login">
                             <Button
                                 variant="ghost"
-                                size="md"
+                                size="xl"
                                 className={`font-medium transition-colors ${
                                     scrolled
                                         ? 'text-slate-700  hover:bg-slate-100 '

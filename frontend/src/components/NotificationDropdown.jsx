@@ -50,6 +50,7 @@ function getNotificationPath(type, data, role) {
             return null;
 
         case 'new_account_registration':
+        case 'new_student_registration':
             return '/accounts';
 
         case 'new_boarding_house':
@@ -72,6 +73,7 @@ const NOTIFICATION_ICON_CONFIG = {
     account_approved:          { icon: ShieldCheck, color: 'bg-green-100 text-green-600' },
     account_rejected:          { icon: ShieldX,     color: 'bg-red-100 text-red-600' },
     new_account_registration:  { icon: UserPlus,    color: 'bg-purple-100 text-purple-600' },
+    new_student_registration:  { icon: UserPlus,    color: 'bg-purple-100 text-purple-600' },
     new_boarding_house:        { icon: Building2,   color: 'bg-orange-100 text-orange-600' },
     boarding_house_approved:   { icon: Building2,   color: 'bg-green-100 text-green-600' },
     boarding_house_rejected:   { icon: Building2,   color: 'bg-red-100 text-red-600' },
@@ -195,7 +197,7 @@ export default function NotificationDropdown() {
                     )}
                 </div>
 
-                <ScrollArea className="max-h-100">
+                <ScrollArea className="max-h-96">
                     {loading && notifications.length === 0 ? (
                         <div className="p-6 text-center text-sm text-slate-500">Loading...</div>
                     ) : notifications.length === 0 ? (

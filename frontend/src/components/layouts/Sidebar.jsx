@@ -19,7 +19,7 @@ const navItems = [
     { to: '/boarding-houses/map', label: 'Map View',      icon: Map,             roles: ['admin', 'owner'] },
     { to: '/reservations',      label: 'Reservations',    icon: BookOpen,        roles: ['owner'], showBadge: true },
     { to: '/owners',            label: 'Owners',          icon: UserCog,         roles: ['admin'] },
-    { to: '/accounts',          label: 'Accounts',        icon: ShieldCheck,     roles: ['admin'], showAccountBadge: true },
+    { to: '/accounts',          label: 'Accounts',        icon: ShieldCheck,     roles: ['admin', 'owner'], showAccountBadge: true },
     {
         label: 'Reports', icon: FileText, roles: ['admin', 'owner'],
         children: [
@@ -35,6 +35,7 @@ const navItems = [
     { to: '/student-dashboard', label: 'My Dashboard', icon: GraduationCap, roles: ['student'] },
     { to: '/student-reservations', label: 'My Reservations', icon: BookOpen, roles: ['student'] },
     { to: '/student-documents', label: 'My Documents',  icon: FileText,      roles: ['student'] },
+    { to: '/student-settings', label: 'Settings', icon: Settings2, roles: ['student'] },
 ];
 
 export default function Sidebar({ open, onClose }) {
@@ -45,7 +46,7 @@ export default function Sidebar({ open, onClose }) {
 
     // Poll pending account count for admin
     useEffect(() => {
-        if (user?.role !== 'admin') return;
+        if (!['admin', 'owner'].includes(user?.role)) return;
         const fetchCount = () => {
             api.get('/accounts/pending-count')
                .then(r => setPendingAccounts(r.data.pending_accounts || 0))

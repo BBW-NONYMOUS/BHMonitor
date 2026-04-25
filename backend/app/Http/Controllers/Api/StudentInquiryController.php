@@ -174,7 +174,8 @@ class StudentInquiryController extends Controller
         }
 
         $reservations = StudentInquiry::with([
-                'student:id,boarding_house_id,room_id',
+                'student:id,user_id,boarding_house_id,room_id',
+                'student.user:id,profile_photo',
             ])
             ->where('boarding_house_id', $boardingHouseId)
             ->orderByDesc('created_at')
@@ -190,7 +191,8 @@ class StudentInquiryController extends Controller
     {
         $inquiry = StudentInquiry::with([
             'boardingHouse',
-            'student:id,boarding_house_id,room_id',
+            'student:id,user_id,boarding_house_id,room_id',
+            'student.user:id,profile_photo',
         ])->findOrFail($id);
         $user    = $request->user();
 
@@ -233,7 +235,8 @@ class StudentInquiryController extends Controller
             'message'     => 'Reservation updated successfully.',
             'reservation' => $inquiry->fresh([
                 'boardingHouse',
-                'student:id,boarding_house_id,room_id',
+                'student:id,user_id,boarding_house_id,room_id',
+                'student.user:id,profile_photo',
             ]),
         ]);
     }
@@ -275,7 +278,8 @@ class StudentInquiryController extends Controller
 
         $query = StudentInquiry::with([
             'boardingHouse:id,boarding_name',
-            'student:id,boarding_house_id,room_id',
+            'student:id,user_id,boarding_house_id,room_id',
+            'student.user:id,profile_photo',
         ]);
 
         if ($user->role === 'owner' && $user->owner) {

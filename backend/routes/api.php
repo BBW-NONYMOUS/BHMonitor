@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\StudentInquiryController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\StudentDocumentController;
 use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\RecommendationController;
 
 // ─── Public Auth ───────────────────────────────────────────────────────────
 Route::post('/login',            [AuthController::class, 'login']);
@@ -45,6 +46,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/students/{student}/assign',            [StudentController::class, 'assignForm']);
     Route::post('/students/{student}/assign',           [StudentController::class, 'assign']);
     Route::get('/students/{student}/boarding-history',  [StudentController::class, 'boardingHistory']);
+    Route::get('/pending-approvals',                    [StudentController::class, 'pendingApprovals']);
+    Route::post('/students/{student}/approve-boarding', [StudentController::class, 'approveBoardingStudent']);
+    Route::post('/students/{student}/decline-boarding', [StudentController::class, 'declineBoardingStudent']);
 
     // Student Documents
     Route::get('/students/{student}/documents',                         [StudentDocumentController::class, 'index']);
@@ -75,6 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reservations/approved-for-direct-add',            [StudentInquiryController::class, 'approvedForDirectAdd']);
     Route::put('/reservations/{id}',                               [StudentInquiryController::class, 'update']);
 
+    // Account reviews: admins see all pending accounts, owners see students registered to their boarding houses.
+    Route::get('/accounts',                     [AccountController::class, 'index']);
+    Route::get('/accounts/pending-count',       [AccountController::class, 'pendingCount']);
+    Route::put('/accounts/{user}/approve',      [AccountController::class, 'approve']);
+    Route::put('/accounts/{user}/reject',       [AccountController::class, 'reject']);
+
     // Legacy aliases
     Route::get('/boarding-houses/{boardingHouse}/inquiries',  [StudentInquiryController::class, 'index']);
     Route::get('/student-inquiries/counts',                   [StudentInquiryController::class, 'counts']);
@@ -88,6 +98,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/read-all',           [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}',            [NotificationController::class, 'destroy']);
     Route::delete('/notifications/clear-read',      [NotificationController::class, 'clearRead']);
+
+    // ─── Recommendations ─────────────────────────────────────────────────
+    Route::get('/my-recommendations',               [RecommendationController::class, 'studentRecommendations']);
+    Route::get('/owner-recommendations',            [RecommendationController::class, 'ownerRecommendations']);
+    Route::post('/recommendations/request',         [RecommendationController::class, 'requestRecommendation']);
+    Route::post('/recommendations/{recommendation}/accept',   [RecommendationController::class, 'acceptRecommendation']);
+    Route::post('/recommendations/{recommendation}/reject',   [RecommendationController::class, 'rejectRecommendation']);
+    Route::post('/recommendations/{recommendation}/submit',   [RecommendationController::class, 'submitRecommendation']);
+    Route::get('/recommendations/{recommendation}/view',      [RecommendationController::class, 'viewRecommendation']);
+    Route::delete('/recommendations/{recommendation}/withdraw', [RecommendationController::class, 'withdrawRecommendation']);
 
     // ─── Map ─────────────────────────────────────────────────────────────
     Route::get('/map/markers', [MapController::class, 'markers']);
@@ -109,10 +129,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/boarding-houses/{boardingHouse}/reject',  [BoardingHouseController::class, 'reject']);
 
         // Account management
-        Route::get('/accounts',                     [AccountController::class, 'index']);
-        Route::get('/accounts/pending-count',       [AccountController::class, 'pendingCount']);
-        Route::put('/accounts/{user}/approve',      [AccountController::class, 'approve']);
-        Route::put('/accounts/{user}/reject',       [AccountController::class, 'reject']);
         Route::delete('/accounts/{user}',           [AccountController::class, 'destroy']);
 
         // Database backup / restore

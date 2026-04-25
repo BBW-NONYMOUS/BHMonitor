@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\BoardingHouse;
 use App\Models\Notification;
 use App\Models\Owner;
 use App\Models\Student;
@@ -99,10 +100,14 @@ class AuthController extends Controller
             'year_level'     => 'nullable|string|max:50',
             'contact_number' => 'nullable|digits_between:1,11',
             'address'        => 'nullable|string|max:500',
+            'boarding_house_id' => 'nullable|exists:boarding_houses,id',
             'profile_photo'  => 'nullable|image|max:5120',
         ]);
 
         $profilePhoto = $this->storeProfilePhoto($request);
+
+        // Normalize empty string to null so FK column receives null, not ""
+        $data['boarding_house_id'] = $data['boarding_house_id'] ?: null;
 
         // If a student record with this student_no already exists, link to it
         $existingStudent = Student::where('student_no', $data['student_no'])->first();
@@ -127,8 +132,11 @@ class AuthController extends Controller
 
         if ($existingStudent) {
             $existingStudent->update([
-                'user_id' => $user->id,
-                'address' => $data['address'] ?? $existingStudent->address,
+                'user_id'            => $user->id,
+                'address'            => $data['address'] ?? $existingStudent->address,
+                'boarding_house_id'  => $data['boarding_house_id'] ?? $existingStudent->boarding_house_id,
+                'boarding_approval_status' => !empty($data['boarding_house_id']) ? 'pending' : $existingStudent->boarding_approval_status,
+                'boarding_rejection_comment' => !empty($data['boarding_house_id']) ? null : $existingStudent->boarding_rejection_comment,
             ]);
         } else {
             Student::create([
@@ -141,6 +149,8 @@ class AuthController extends Controller
                 'year_level'     => $data['year_level'] ?? null,
                 'contact_number' => $data['contact_number'] ?? null,
                 'address'        => $data['address'] ?? null,
+                'boarding_house_id' => $data['boarding_house_id'] ?? null,
+                'boarding_approval_status' => !empty($data['boarding_house_id']) ? 'pending' : null,
             ]);
         }
 
@@ -154,6 +164,25 @@ class AuthController extends Controller
         User::where('role', 'admin')->each(function (User $admin) use ($user) {
             Notification::createNewAccountRegistrationNotification($admin, $user);
         });
+
+        if (!empty($data['boarding_house_id'])) {
+            $boardingHouse = BoardingHouse::with('owner.user')->find($data['boarding_house_id']);
+            $ownerUser = $boardingHouse?->owner?->user;
+
+            if ($ownerUser) {
+                Notification::create([
+                    'user_id' => $ownerUser->id,
+                    'type'    => 'new_student_registration',
+                    'title'   => 'New Student Registration Pending',
+                    'message' => "{$user->name} registered for {$boardingHouse->boarding_name} and needs your review.",
+                    'data'    => [
+                        'applicant_id' => $user->id,
+                        'student_id' => $user->student?->id,
+                        'boarding_house_id' => $boardingHouse->id,
+                    ],
+                ]);
+            }
+        }
 
         // Return without token — account is pending, they must wait for approval
         return response()->json([

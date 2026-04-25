@@ -28,4 +28,19 @@ class Owner extends Model
     {
         return $this->hasMany(BoardingHouse::class);
     }
+
+    public function recommendations()
+    {
+        return $this->hasMany(StudentRecommendation::class);
+    }
+
+    public function recommendationTemplates()
+    {
+        return $this->hasMany(RecommendationTemplate::class);
+    }
+
+    public function recommendationStats()
+    {
+        return $this->hasOne(OwnerRecommendationStat::class);
+    }
 }

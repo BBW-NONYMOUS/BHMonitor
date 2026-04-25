@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     GraduationCap, Home, FileText, Search, MapPin,
-    Phone, BookOpen, Calendar, User
+    Phone, BookOpen, Calendar, User, Settings2
 } from 'lucide-react';
 
 function Field({ label, value, icon: Icon }) {
@@ -175,6 +175,7 @@ export default function StudentDashboardPage() {
                                 <Field label="Boarding House" value={bh.boarding_name} icon={Home} />
                                 <Field label="Address" value={bh.address} icon={MapPin} />
                                 <Field label="Owner" value={bh.owner?.full_name} icon={User} />
+                                <Field label="Approval" value={student?.boarding_approval_status} icon={User} />
                                 <Field
                                     label="Monthly Rate"
                                     value={bh.room_rate ? `₱${Number(bh.room_rate).toLocaleString()}/mo` : null}
@@ -212,6 +213,12 @@ export default function StudentDashboardPage() {
                                 {docCount > 0 && (
                                     <Badge variant="secondary" className="ml-auto">{docCount}</Badge>
                                 )}
+                            </Button>
+                        </Link>
+                        <Link to="/student-settings">
+                            <Button variant="outline" className="w-full justify-start gap-2">
+                                <Settings2 className="h-4 w-4 text-slate-500" />
+                                Account Settings
                             </Button>
                         </Link>
                         <Link to="/find-boarding" target="_blank">

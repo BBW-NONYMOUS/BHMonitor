@@ -65,7 +65,9 @@ class StudentFinderController extends Controller
             $query->orderByDesc('created_at');
         }
 
-        return response()->json($query->paginate(12));
+        $perPage = min((int) $request->get('per_page', 12), 100);
+
+        return response()->json($query->paginate(max($perPage, 1)));
     }
 
     public function show(int $id): JsonResponse

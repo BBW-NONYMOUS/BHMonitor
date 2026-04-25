@@ -51,6 +51,11 @@ function initials(name) {
         : name[0].toUpperCase();
 }
 
+function studentPhotoUrl(reservation) {
+    const photo = reservation?.student?.user?.profile_photo;
+    return photo ? `/storage/${photo}` : null;
+}
+
 function isReservationAssigned(reservation) {
     return Number(reservation.student?.boarding_house_id) === Number(reservation.boarding_house_id);
 }
@@ -271,10 +276,13 @@ export default function AllReservationsPage() {
                                                     <div className="flex items-start gap-2.5">
                                                         <button
                                                             onClick={() => setProfileTarget(reservation)}
-                                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 transition-colors"
+                                                            className="h-9 w-9 shrink-0 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-xs font-bold text-white hover:opacity-90 transition-opacity"
                                                             title="View profile"
                                                         >
-                                                            {initials(reservation.full_name)}
+                                                            {studentPhotoUrl(reservation)
+                                                                ? <img src={studentPhotoUrl(reservation)} alt={reservation.full_name} className="h-full w-full object-cover" />
+                                                                : initials(reservation.full_name)
+                                                            }
                                                         </button>
                                                         <div>
                                                             <button
@@ -345,7 +353,7 @@ export default function AllReservationsPage() {
 
                                                 {/* Status badge */}
                                                 <TableCell className="py-3">
-                                                    <StatusBadge status={reservation.status} />
+                                                    <StatusBadge status={alreadyAssigned ? 'approved' : reservation.status} />
                                                 </TableCell>
 
                                                 {/* Update Status dropdown */}
@@ -422,8 +430,11 @@ export default function AllReservationsPage() {
                         <div className="space-y-4 py-1">
                             {/* Avatar + name */}
                             <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-100">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-xl font-bold text-white shadow">
-                                    {initials(profileTarget.full_name)}
+                                <div className="h-14 w-14 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-xl font-bold text-white shadow shrink-0">
+                                    {studentPhotoUrl(profileTarget)
+                                        ? <img src={studentPhotoUrl(profileTarget)} alt={profileTarget.full_name} className="h-full w-full object-cover" />
+                                        : initials(profileTarget.full_name)
+                                    }
                                 </div>
                                 <div>
                                     <p className="text-lg font-bold text-slate-900">{profileTarget.full_name}</p>
@@ -527,8 +538,11 @@ export default function AllReservationsPage() {
                     {assignTarget && (
                         <div className="space-y-4 py-1">
                             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
-                                    {initials(assignTarget.full_name)}
+                                <div className="h-10 w-10 shrink-0 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center font-bold text-white">
+                                    {studentPhotoUrl(assignTarget)
+                                        ? <img src={studentPhotoUrl(assignTarget)} alt={assignTarget.full_name} className="h-full w-full object-cover" />
+                                        : initials(assignTarget.full_name)
+                                    }
                                 </div>
                                 <div>
                                     <p className="font-semibold text-slate-900">{assignTarget.full_name}</p>

@@ -42,6 +42,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [boardingHouses, setBoardingHouses] = useState([]);
     const [showOnboarding, setShowOnboarding] = useState(true);
+    const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
     useEffect(() => {
         api.get('/dashboard').then(r => setData(r.data)).finally(() => setLoading(false));
@@ -49,8 +50,12 @@ export default function DashboardPage() {
         // Fetch boarding houses for owners to check onboarding status
         if (isOwner()) {
             api.get('/boarding-houses').then(r => setBoardingHouses(r.data?.data || [])).catch(() => {});
+            // Fetch pending approvals count for owners
+            api.get('/pending-approvals').then(r => {
+                setPendingApprovalsCount(r.data?.total || r.data?.data?.length || 0);
+            }).catch(() => {});
         }
-    }, []);
+    }, [isOwner]);
 
     if (loading) {
         return <DashboardSkeleton />;
@@ -144,6 +149,19 @@ export default function DashboardPage() {
                             <Clock className="h-4 w-4 shrink-0 text-amber-500" />
                             <span>
                                 <strong>{stats.pending_approvals}</strong> boarding {stats.pending_approvals === 1 ? 'house' : 'houses'} pending your approval.
+                            </span>
+                            <span className="ml-auto font-medium underline">Review now →</span>
+                        </div>
+                    </Link>
+                )}
+
+                {/* Pending Student Approvals banner — owners only */}
+                {isOwner() && pendingApprovalsCount > 0 && (
+                    <Link to="/student-approvals">
+                        <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 hover:bg-green-100 transition-colors cursor-pointer">
+                            <Clock className="h-4 w-4 shrink-0 text-green-500" />
+                            <span>
+                                <strong>{pendingApprovalsCount}</strong> student {pendingApprovalsCount === 1 ? 'application' : 'applications'} pending your review.
                             </span>
                             <span className="ml-auto font-medium underline">Review now →</span>
                         </div>

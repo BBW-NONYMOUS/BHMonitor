@@ -16,9 +16,9 @@ import {
 const STATUS_CONFIG = {
     pending:   { label: 'Pending',   color: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-500',  icon: Clock },
     contacted: { label: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-200',   dot: 'bg-blue-500',   icon: MessageCircle },
-    approved:  { label: 'Approved',  color: 'bg-green-100 text-green-700 border-green-200',dot: 'bg-green-500',  icon: CheckCircle },
-    declined:  { label: 'Declined',  color: 'bg-red-100 text-red-700 border-red-200',      dot: 'bg-red-500',    icon: XCircle },
-    cancelled: { label: 'Cancelled', color: 'bg-slate-100 text-slate-600 border-slate-200',dot: 'bg-slate-400',  icon: AlertCircle },
+    approved:  { label: 'Approved',  color: 'bg-green-100 text-green-700 border-green-200', dot: 'bg-green-500', icon: CheckCircle },
+    declined:  { label: 'Declined',  color: 'bg-red-100 text-red-700 border-red-200',       dot: 'bg-red-500',   icon: XCircle },
+    cancelled: { label: 'Cancelled', color: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400', icon: AlertCircle },
 };
 
 const FILTER_TABS = [
@@ -49,6 +49,11 @@ function initials(name) {
         : name[0].toUpperCase();
 }
 
+function studentPhotoUrl(reservation) {
+    const photo = reservation?.student?.user?.profile_photo;
+    return photo ? `/storage/${photo}` : null;
+}
+
 function isReservationAssigned(reservation) {
     return Number(reservation.student?.boarding_house_id) === Number(reservation.boarding_house_id);
 }
@@ -60,13 +65,10 @@ export default function ReservationsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [updating, setUpdating] = useState(null);
-
-    // Student profile modal
     const [profileTarget, setProfileTarget] = useState(null);
 
     useEffect(() => { fetchReservations(); }, [boardingHouseId]);
 
-    // Auto-open student modal when navigated from a notification (?inquiry=<id>)
     useEffect(() => {
         const inquiryId = searchParams.get('inquiry');
         if (!inquiryId || reservations.length === 0) return;
@@ -91,7 +93,6 @@ export default function ReservationsPage() {
 
     const updateStatus = async (id, newStatus) => {
         const snapshot = reservations;
-        // Optimistic — change immediately so the Select shows the new value right away
         setReservations(rs => rs.map(r => r.id === id ? { ...r, status: newStatus } : r));
         setUpdating(id);
         try {
@@ -99,7 +100,7 @@ export default function ReservationsPage() {
             setReservations(rs => rs.map(r => r.id === id ? { ...r, ...data.reservation } : r));
             toast.success(`Status set to "${STATUS_CONFIG[newStatus]?.label || newStatus}".`);
         } catch (err) {
-            setReservations(snapshot);          // revert on failure
+            setReservations(snapshot);
             toast.error(err.response?.data?.message || 'Failed to update status.');
         } finally {
             setUpdating(null);
@@ -120,7 +121,7 @@ export default function ReservationsPage() {
     return (
         <div className="mx-auto max-w-6xl space-y-6 px-2">
 
-            {/* ── Header ── */}
+            {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="flex items-center gap-2.5 text-2xl font-bold text-slate-900">
@@ -139,7 +140,7 @@ export default function ReservationsPage() {
                 </Button>
             </div>
 
-            {/* ── Stats ── */}
+            {/* Stats */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                     { key: 'all',       label: 'Total',     bg: 'bg-white',    text: 'text-slate-900', border: 'border-slate-200', icon: Users },
@@ -161,7 +162,7 @@ export default function ReservationsPage() {
                 ))}
             </div>
 
-            {/* ── Filter Tabs ── */}
+            {/* Filter Tabs */}
             <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
                 {FILTER_TABS.map(({ key, label }) => (
                     <button
@@ -181,7 +182,7 @@ export default function ReservationsPage() {
                 ))}
             </div>
 
-            {/* ── Table ── */}
+            {/* Table */}
             {loading ? (
                 <div className="flex items-center justify-center py-24">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -218,6 +219,7 @@ export default function ReservationsPage() {
                                     {filtered.map((reservation) => {
                                         const alreadyAssigned = isReservationAssigned(reservation);
                                         const isUpdating = updating === reservation.id;
+                                        const photoUrl = studentPhotoUrl(reservation);
                                         return (
                                             <TableRow key={reservation.id} className="hover:bg-slate-50/60 align-top">
 
@@ -226,10 +228,13 @@ export default function ReservationsPage() {
                                                     <div className="flex items-start gap-2.5">
                                                         <button
                                                             onClick={() => setProfileTarget(reservation)}
-                                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 transition-colors"
+                                                            className="h-9 w-9 shrink-0 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-xs font-bold text-white hover:opacity-90 transition-opacity"
                                                             title="View profile"
                                                         >
-                                                            {initials(reservation.full_name)}
+                                                            {photoUrl
+                                                                ? <img src={photoUrl} alt={reservation.full_name} className="h-full w-full object-cover" />
+                                                                : initials(reservation.full_name)
+                                                            }
                                                         </button>
                                                         <div>
                                                             <button
@@ -242,7 +247,7 @@ export default function ReservationsPage() {
                                                                 <p className="text-xs text-slate-400 font-mono">{reservation.student_no}</p>
                                                             )}
                                                             {reservation.course && (
-                                                                <p className="text-xs text-slate-400">{reservation.course} · {reservation.year_level}</p>
+                                                                <p className="text-xs text-slate-400">{reservation.course} {'·'} {reservation.year_level}</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -282,7 +287,7 @@ export default function ReservationsPage() {
                                                         )}
                                                         {reservation.message && (
                                                             <p className="max-w-32 truncate text-xs text-slate-400 italic" title={reservation.message}>
-                                                                "{reservation.message}"
+                                                                &quot;{reservation.message}&quot;
                                                             </p>
                                                         )}
                                                     </div>
@@ -293,9 +298,9 @@ export default function ReservationsPage() {
                                                     {new Date(reservation.created_at).toLocaleDateString()}
                                                 </TableCell>
 
-                                                {/* Status badge */}
+                                                {/* Status badge — show Approved when student is already assigned */}
                                                 <TableCell className="py-3">
-                                                    <StatusBadge status={reservation.status} />
+                                                    <StatusBadge status={alreadyAssigned ? 'approved' : reservation.status} />
                                                 </TableCell>
 
                                                 {/* Update Status dropdown */}
@@ -325,7 +330,7 @@ export default function ReservationsPage() {
                                                     )}
                                                     {isUpdating && (
                                                         <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-                                                            <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+                                                            <Loader2 className="h-3 w-3 animate-spin" /> Saving...
                                                         </p>
                                                     )}
                                                 </TableCell>
@@ -336,10 +341,8 @@ export default function ReservationsPage() {
                                                         <span className="flex items-center gap-1 text-xs font-medium text-green-600">
                                                             <CheckCircle className="h-3.5 w-3.5" /> Assigned
                                                         </span>
-                                                    ) : ['declined', 'cancelled'].includes(reservation.status) ? (
-                                                        <span className="text-xs text-slate-300">—</span>
                                                     ) : (
-                                                        <span className="text-xs text-slate-300">â€”</span>
+                                                        <span className="text-xs text-slate-300">{'—'}</span>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
@@ -352,8 +355,8 @@ export default function ReservationsPage() {
                 </Card>
             )}
 
-            {/* ── Student Profile Modal ── */}
-            <Dialog open={!!profileTarget} onOpenChange={v => !v && setProfileTarget(null)}>
+            {/* Student Profile Modal */}
+            <Dialog open={!!profileTarget} onOpenChange={(v) => !v && setProfileTarget(null)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -365,8 +368,11 @@ export default function ReservationsPage() {
                         <div className="space-y-4 py-1">
                             {/* Avatar + name */}
                             <div className="flex items-center gap-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-100">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-xl font-bold text-white shadow">
-                                    {initials(profileTarget.full_name)}
+                                <div className="h-14 w-14 shrink-0 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-xl font-bold text-white shadow">
+                                    {studentPhotoUrl(profileTarget)
+                                        ? <img src={studentPhotoUrl(profileTarget)} alt={profileTarget.full_name} className="h-full w-full object-cover" />
+                                        : initials(profileTarget.full_name)
+                                    }
                                 </div>
                                 <div>
                                     <p className="text-lg font-bold text-slate-900">{profileTarget.full_name}</p>
@@ -374,7 +380,7 @@ export default function ReservationsPage() {
                                         <p className="font-mono text-sm text-slate-500">{profileTarget.student_no}</p>
                                     )}
                                     <div className="mt-1">
-                                        <StatusBadge status={profileTarget.status} />
+                                        <StatusBadge status={isReservationAssigned(profileTarget) ? 'approved' : profileTarget.status} />
                                     </div>
                                 </div>
                             </div>
@@ -408,7 +414,7 @@ export default function ReservationsPage() {
                                 {profileTarget.budget && (
                                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                         <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Budget</p>
-                                        <p className="mt-0.5 font-medium text-green-700">₱{Number(profileTarget.budget).toLocaleString()}/mo</p>
+                                        <p className="mt-0.5 font-medium text-green-700">&#8369;{Number(profileTarget.budget).toLocaleString()}/mo</p>
                                     </div>
                                 )}
                             </div>
@@ -433,75 +439,13 @@ export default function ReservationsPage() {
                             {profileTarget.message && (
                                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
                                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-400">Message to Owner</p>
-                                    <p className="text-sm text-slate-700 italic">"{profileTarget.message}"</p>
+                                    <p className="text-sm text-slate-700 italic">&quot;{profileTarget.message}&quot;</p>
                                 </div>
                             )}
                         </div>
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setProfileTarget(null)}>Close</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* ── Assign Student Dialog ── */}
-            <Dialog open={!!assignTarget} onOpenChange={v => !v && setAssignTarget(null)}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100">
-                                <UserPlus className="h-4 w-4 text-green-600" />
-                            </div>
-                            Assign Student
-                        </DialogTitle>
-                    </DialogHeader>
-                    {assignTarget && (
-                        <div className="space-y-4 py-1">
-                            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
-                                    {initials(assignTarget.full_name)}
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-slate-900">{assignTarget.full_name}</p>
-                                    {assignTarget.course && <p className="text-xs text-slate-400">{assignTarget.course} · {assignTarget.year_level}</p>}
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-sm font-medium">
-                                    Assign to Room <span className="font-normal text-slate-400">(optional)</span>
-                                </Label>
-                                {loadingRooms ? (
-                                    <div className="flex items-center gap-2 py-2 text-sm text-slate-500">
-                                        <Loader2 className="h-4 w-4 animate-spin" /> Loading rooms…
-                                    </div>
-                                ) : (
-                                    <Select value={roomId} onValueChange={setRoomId}>
-                                        <SelectTrigger className="bg-white">
-                                            <SelectValue placeholder="No room assignment" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">No room assignment</SelectItem>
-                                            {rooms.length === 0 ? (
-                                                <div className="px-3 py-2 text-xs text-slate-400">No available rooms</div>
-                                            ) : rooms.map(room => (
-                                                <SelectItem key={room.id} value={String(room.id)}>
-                                                    {room.room_name} — {room.student_count ?? 0}/{room.capacity} slots ({room.gender_type})
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                <p className="text-xs text-slate-400">Only rooms with available slots are shown.</p>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter className="gap-2">
-                        <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={accepting}>Cancel</Button>
-                        <Button onClick={handleAssign} disabled={accepting || loadingRooms} className="bg-green-600 hover:bg-green-700">
-                            {accepting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm & Assign
-                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

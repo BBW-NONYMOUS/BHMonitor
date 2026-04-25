@@ -64,6 +64,11 @@ class BoardingHouse extends Model
         return $this->hasMany(Student::class);
     }
 
+    public function pendingStudents()
+    {
+        return $this->students()->where('boarding_approval_status', 'pending');
+    }
+
     public function syncRoomCounts(): void
     {
         $this->total_rooms = $this->rooms()->count();
