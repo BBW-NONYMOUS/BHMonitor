@@ -32,9 +32,12 @@ class AccountController extends Controller
 
         $query = User::with(['owner', 'student.boardingHouse']);
 
-        // Admin sees only OWNER accounts
+        // Admin sees all non-admin accounts (owners and students)
         if ($user->isAdmin()) {
-            $query->where('role', 'owner');
+            $query->whereIn('role', ['owner', 'student']);
+            if ($status === 'deleted') {
+                $query->onlyTrashed();
+            }
         }
         // Owners see only STUDENT accounts from their boarding houses
         elseif ($user->isOwner()) {
@@ -48,7 +51,7 @@ class AccountController extends Controller
                 });
         }
 
-        if ($status && $user->isAdmin()) {
+        if ($status && $status !== 'deleted' && $user->isAdmin()) {
             $query->where('account_status', $status);
         }
         if ($role && $user->isAdmin()) {
@@ -204,7 +207,7 @@ class AccountController extends Controller
     }
 
     /**
-     * Delete a user account — admin only
+     * Deactivate a user account with soft delete — admin only
      */
     public function destroy(Request $request, User $user): JsonResponse
     {
@@ -218,11 +221,40 @@ class AccountController extends Controller
 
         ActivityLog::create([
             'user_id'    => $request->user()->id,
-            'action'     => "Deleted account for {$name}.",
+            'action'     => "Deactivated account for {$name}.",
             'created_at' => now(),
         ]);
 
-        return response()->json(['message' => "Account for {$name} deleted."]);
+        return response()->json(['message' => "Account for {$name} deactivated. Linked student, boarding house, and reservation data were preserved."]);
+    }
+
+    public function restore(Request $request, int $id): JsonResponse
+    {
+        $actor = $request->user();
+        if (!$actor->isAdmin()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $user = User::withTrashed()->findOrFail($id);
+        if (!$user->trashed()) {
+            return response()->json([
+                'message' => "Account for {$user->name} is already active.",
+                'user'    => $this->payload($user),
+            ]);
+        }
+
+        $user->restore();
+
+        ActivityLog::create([
+            'user_id'    => $actor->id,
+            'action'     => "Restored account for {$user->name}.",
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => "Account for {$user->name} restored.",
+            'user'    => $this->payload($user->fresh()),
+        ]);
     }
 
     /**
@@ -262,6 +294,8 @@ class AccountController extends Controller
             'role'             => $user->role,
             'account_status'   => $user->account_status,
             'rejection_reason' => $user->rejection_reason,
+            'is_deleted'       => $user->trashed(),
+            'deleted_at'       => $user->deleted_at?->format('M d, Y'),
             'created_at'       => $user->created_at?->format('M d, Y'),
             'student_no'       => $user->student?->student_no,
             'student_id'       => $user->student?->id,

@@ -196,6 +196,14 @@ class RoomController extends Controller
 
         $student = Student::findOrFail($data['student_id']);
 
+        if (
+            $student->boarding_house_id
+            && (int) $student->boarding_house_id !== (int) $boardingHouse->id
+            && in_array($student->boarding_approval_status, ['approved', null], true)
+        ) {
+            return response()->json(['message' => 'You are already registered in a boarding house'], 422);
+        }
+
         // Enforce slot limit
         $currentCount = $room->students()->count();
         if ($currentCount >= $room->capacity) {
@@ -215,6 +223,8 @@ class RoomController extends Controller
         $student->update([
             'room_id'           => $room->id,
             'boarding_house_id' => $boardingHouse->id,
+            'boarding_approval_status' => 'approved',
+            'boarding_rejection_comment' => null,
         ]);
 
         // Update room slot counts

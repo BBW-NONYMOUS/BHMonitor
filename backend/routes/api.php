@@ -131,6 +131,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Account management
         Route::delete('/accounts/{user}',           [AccountController::class, 'destroy']);
+        Route::put('/accounts/{id}/restore',        [AccountController::class, 'restore']);
 
         // Database backup / restore
         Route::get('/backup/export',    [BackupController::class, 'export']);

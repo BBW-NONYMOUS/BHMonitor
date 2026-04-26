@@ -12,9 +12,46 @@ use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class StudentInquiryController extends Controller
 {
+    private function findReservationStudent(StudentInquiry $inquiry): ?Student
+    {
+        if ($inquiry->student) {
+            return $inquiry->student;
+        }
+
+        if ($inquiry->student_no) {
+            return Student::where('student_no', $inquiry->student_no)->first();
+        }
+
+        if ($inquiry->email) {
+            return User::where('email', $inquiry->email)->first()?->student;
+        }
+
+        return null;
+    }
+
+    private function ensureStudentCanBeApproved(StudentInquiry $inquiry): void
+    {
+        $student = $this->findReservationStudent($inquiry);
+
+        if (
+            $student
+            && $student->boarding_house_id
+            && in_array($student->boarding_approval_status, ['approved', null], true)
+        ) {
+            $message = (int) $student->boarding_house_id === (int) $inquiry->boarding_house_id
+                ? 'You are already registered in this specific boarding house'
+                : 'You are already registered in a boarding house';
+
+            throw ValidationException::withMessages([
+                'student_id' => [$message],
+            ]);
+        }
+    }
+
     private function syncApprovedReservation(StudentInquiry $inquiry, Request $request): void
     {
         if ($inquiry->status !== 'approved') {
@@ -44,6 +81,7 @@ class StudentInquiryController extends Controller
                 'contact_number'    => $inquiry->contact_number,
                 'address'           => $inquiry->address,
                 'boarding_house_id' => $inquiry->boarding_house_id,
+                'boarding_approval_status' => 'approved',
             ]);
 
             StudentBoardingHistory::create([
@@ -72,6 +110,8 @@ class StudentInquiryController extends Controller
                 $student->update([
                     'boarding_house_id' => $newBoardingHouseId,
                     'room_id'           => null,
+                    'boarding_approval_status' => 'approved',
+                    'boarding_rejection_comment' => null,
                 ]);
 
                 StudentBoardingHistory::create([
@@ -79,6 +119,11 @@ class StudentInquiryController extends Controller
                     'boarding_house_id' => $newBoardingHouseId,
                     'boarded_at'        => now(),
                     'notes'             => 'Assigned automatically from approved reservation.',
+                ]);
+            } else {
+                $student->update([
+                    'boarding_approval_status' => 'approved',
+                    'boarding_rejection_comment' => null,
                 ]);
             }
         }
@@ -101,6 +146,12 @@ class StudentInquiryController extends Controller
             return response()->json(['message' => 'Only student accounts can submit reservations.'], 403);
         }
 
+        if (!$user->isApproved()) {
+            return response()->json([
+                'message' => 'Reservation cannot proceed due to inactive account.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'boarding_house_id' => 'required|exists:boarding_houses,id',
             'move_in_date'      => 'nullable|date|after_or_equal:today',
@@ -114,6 +165,12 @@ class StudentInquiryController extends Controller
 
         // Auto-populate from authenticated student account
         $student = $user?->student;
+
+        if (!$student) {
+            return response()->json([
+                'message' => 'Profile incomplete or inactive. Please complete your student profile before reserving.',
+            ], 422);
+        }
 
         if ($student) {
             $validated['full_name']      = $student->first_name . ' ' . $student->last_name;
@@ -204,6 +261,10 @@ class StudentInquiryController extends Controller
             'status'      => 'sometimes|in:pending,contacted,approved,declined,cancelled',
             'owner_notes' => 'nullable|string|max:1000',
         ]);
+
+        if (($validated['status'] ?? null) === 'approved' && $inquiry->status !== 'approved') {
+            $this->ensureStudentCanBeApproved($inquiry);
+        }
 
         $inquiry->update($validated);
         $inquiry->refresh();

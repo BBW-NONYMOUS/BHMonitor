@@ -13,10 +13,27 @@ use App\Models\StudentInquiry;
 use App\Models\StudentWarning;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class StudentController extends Controller
 {
+    private function registrationConflictResponse(Student $student, int $boardingHouseId): ?JsonResponse
+    {
+        if (
+            $student->boarding_house_id
+            && in_array($student->boarding_approval_status, ['approved', null], true)
+        ) {
+            $message = (int) $student->boarding_house_id === $boardingHouseId
+                ? 'You are already registered in this specific boarding house'
+                : 'You are already registered in a boarding house';
+
+            return response()->json(['message' => $message], 422);
+        }
+
+        return null;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
@@ -55,7 +72,7 @@ class StudentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'student_no'        => 'required|string|unique:students',
+            'student_no'        => 'required|digits_between:1,50|unique:students',
             'first_name'        => 'required|string|max:255',
             'last_name'         => 'required|string|max:255',
             'gender'            => 'nullable|in:Male,Female',
@@ -91,6 +108,10 @@ class StudentController extends Controller
                     'room_id' => ['The selected room is already at full capacity.'],
                 ]);
             }
+        }
+
+        if (!empty($data['boarding_house_id'])) {
+            $data['boarding_approval_status'] = 'approved';
         }
 
         $student = Student::create($data);
@@ -176,8 +197,14 @@ class StudentController extends Controller
         }
 
         if ($existingStudent) {
+            if ($conflict = $this->registrationConflictResponse($existingStudent, (int) $boardingHouseId)) {
+                return $conflict;
+            }
+
             $oldBoardingHouseId = $existingStudent->boarding_house_id;
             $updates = ['boarding_house_id' => $boardingHouseId];
+            $updates['boarding_approval_status'] = 'approved';
+            $updates['boarding_rejection_comment'] = null;
 
             if ($room) {
                 $updates['room_id'] = $room->id;
@@ -227,6 +254,7 @@ class StudentController extends Controller
             'contact_number'    => $reservation->contact_number,
             'address'           => $reservation->address,
             'boarding_house_id' => $boardingHouseId,
+            'boarding_approval_status' => 'approved',
             'room_id'           => $data['room_id'] ?? null,
         ]);
 
@@ -332,10 +360,24 @@ class StudentController extends Controller
         $oldBhId = $student->boarding_house_id;
         $newBhId = $data['boarding_house_id'] ?? $student->boarding_house_id;
 
+        if (
+            $user->isStudent()
+            && $oldBhId
+            && (int) $oldBhId !== (int) $newBhId
+            && in_array($student->boarding_approval_status, ['approved', null], true)
+        ) {
+            throw ValidationException::withMessages([
+                'boarding_house_id' => ['You are already registered in a boarding house'],
+            ]);
+        }
+
         if ($user->isStudent() && (int) $oldBhId !== (int) $newBhId) {
             $data['boarding_approval_status'] = $newBhId ? 'pending' : null;
             $data['boarding_rejection_comment'] = null;
             $data['room_id'] = null;
+        } elseif (!$user->isStudent() && array_key_exists('boarding_house_id', $data)) {
+            $data['boarding_approval_status'] = $newBhId ? 'approved' : null;
+            $data['boarding_rejection_comment'] = null;
         }
 
         $student->update($data);
@@ -384,11 +426,47 @@ class StudentController extends Controller
 
     public function destroy(Request $request, Student $student): JsonResponse
     {
+        $user = $request->user();
         $name = "{$student->first_name} {$student->last_name}";
+
+        if ($user->isOwner()) {
+            $bhIds = BoardingHouse::where('owner_id', $user->owner?->id)->pluck('id');
+
+            if ($bhIds->isEmpty() || !in_array((int) $student->boarding_house_id, $bhIds->map(fn ($id) => (int) $id)->all(), true)) {
+                return response()->json(['message' => 'You can only remove students registered to your boarding house.'], 403);
+            }
+
+            DB::transaction(function () use ($student, $bhIds) {
+                StudentInquiry::where('student_id', $student->id)
+                    ->whereIn('boarding_house_id', $bhIds)
+                    ->delete();
+
+                StudentBoardingHistory::where('student_id', $student->id)
+                    ->whereIn('boarding_house_id', $bhIds)
+                    ->whereNull('vacated_at')
+                    ->update(['vacated_at' => now()]);
+
+                $student->update([
+                    'boarding_house_id' => null,
+                    'room_id' => null,
+                    'boarding_approval_status' => null,
+                    'boarding_rejection_comment' => null,
+                ]);
+            });
+
+            ActivityLog::create([
+                'user_id'    => $user->id,
+                'action'     => "Removed student {$name} from boarding house and cleared related reservations.",
+                'created_at' => now(),
+            ]);
+
+            return response()->json(['message' => 'Student removed from this boarding house. Account remains active.']);
+        }
+
         $student->delete();
 
         ActivityLog::create([
-            'user_id'    => $request->user()->id,
+            'user_id'    => $user->id,
             'action'     => "Deleted student {$name}.",
             'created_at' => now(),
         ]);
@@ -426,7 +504,12 @@ class StudentController extends Controller
                 ->update(['vacated_at' => now()]);
         }
 
-        $student->update(['boarding_house_id' => $newBhId, 'room_id' => null]);
+        $student->update([
+            'boarding_house_id' => $newBhId,
+            'room_id' => null,
+            'boarding_approval_status' => $newBhId ? 'approved' : null,
+            'boarding_rejection_comment' => null,
+        ]);
 
         if ($newBhId) {
             StudentBoardingHistory::create([
@@ -494,6 +577,10 @@ class StudentController extends Controller
             return response()->json([
                 'message' => "Student already has approval status: {$student->boarding_approval_status}"
             ], 422);
+        }
+
+        if ($conflict = $this->registrationConflictResponse($student, (int) $boardingHouse->id)) {
+            return $conflict;
         }
 
         $student->update([

@@ -20,13 +20,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { AlertTriangle, CheckCircle, Clock, Eye, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Eye, RotateCcw, Search, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 
 const STATUS_BADGE = {
     pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
     approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 border-green-200' },
     rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border-red-200' },
     declined: { label: 'Declined', cls: 'bg-red-50 text-red-700 border-red-200' },
+    deleted: { label: 'Inactive', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
 
 function StatusPill({ status }) {
@@ -108,10 +109,20 @@ export default function AccountApprovalsPage() {
     const handleDelete = async (account) => {
         try {
             await api.delete(`/accounts/${account.id}`);
-            toast.success(`Account for ${account.name} deleted.`);
+            toast.success(`Account for ${account.name} deactivated.`);
             fetchAccounts();
         } catch {
-            toast.error('Failed to delete account.');
+            toast.error('Failed to deactivate account.');
+        }
+    };
+
+    const handleRestore = async (account) => {
+        try {
+            await api.put(`/accounts/${account.id}/restore`);
+            toast.success(`Account for ${account.name} restored.`);
+            fetchAccounts();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to restore account.');
         }
     };
 
@@ -159,6 +170,7 @@ export default function AccountApprovalsPage() {
                                 ) : (
                                     <SelectItem value="rejected">Rejected</SelectItem>
                                 )}
+                                {user?.role === 'admin' && <SelectItem value="deleted">Inactive</SelectItem>}
                             </SelectContent>
                         </Select>
                         {user?.role === 'admin' && (
@@ -208,7 +220,9 @@ export default function AccountApprovalsPage() {
                                 ) : accounts.map((account) => {
                                     const reviewStatus = user?.role === 'owner'
                                         ? account.boarding_approval_status
-                                        : account.account_status;
+                                        : account.is_deleted
+                                            ? 'deleted'
+                                            : account.account_status;
                                     return (
                                         <TableRow key={account.id}>
                                             <TableCell className="font-medium">{account.name}</TableCell>
@@ -280,25 +294,37 @@ export default function AccountApprovalsPage() {
                                                         </Button>
                                                     )}
                                                     {user?.role === 'admin' && (
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button size="icon" variant="ghost" className="text-slate-400 hover:bg-red-50 hover:text-red-600" title="Delete account">
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Delete Account?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        This will permanently delete <strong>{account.name}</strong>'s account and cannot be undone.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDelete(account)}>Delete</AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
+                                                        account.is_deleted ? (
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="text-blue-600 hover:bg-blue-50"
+                                                                title="Restore account"
+                                                                onClick={() => handleRestore(account)}
+                                                            >
+                                                                <RotateCcw className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : (
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button size="icon" variant="ghost" className="text-slate-400 hover:bg-red-50 hover:text-red-600" title="Deactivate account">
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Deactivate Account?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            This will disable <strong>{account.name}</strong>'s login while preserving student, boarding house, and reservation records.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDelete(account)}>Deactivate</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        )
                                                     )}
                                                 </div>
                                             </TableCell>

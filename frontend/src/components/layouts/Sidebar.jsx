@@ -43,8 +43,9 @@ export default function Sidebar({ open, onClose }) {
     const { unreadCount } = useNotifications();
     const navigate = useNavigate();
     const [pendingAccounts, setPendingAccounts] = useState(0);
+    const [pendingReservations, setPendingReservations] = useState(0);
 
-    // Poll pending account count for admin
+    // Poll pending account count for admin/owner
     useEffect(() => {
         if (!['admin', 'owner'].includes(user?.role)) return;
         const fetchCount = () => {
@@ -54,6 +55,19 @@ export default function Sidebar({ open, onClose }) {
         };
         fetchCount();
         const interval = setInterval(fetchCount, 60000);
+        return () => clearInterval(interval);
+    }, [user?.role]);
+
+    // Poll pending reservation count for owner
+    useEffect(() => {
+        if (user?.role !== 'owner') return;
+        const fetchReservations = () => {
+            api.get('/reservations/counts')
+               .then(r => setPendingReservations(r.data.pending || 0))
+               .catch(() => {});
+        };
+        fetchReservations();
+        const interval = setInterval(fetchReservations, 30000);
         return () => clearInterval(interval);
     }, [user?.role]);
 
@@ -135,9 +149,9 @@ export default function Sidebar({ open, onClose }) {
                             >
                                 <item.icon className="h-4 w-4 shrink-0" />
                                 {item.label}
-                                {item.showBadge && unreadCount > 0 && (
+                                {item.showBadge && pendingReservations > 0 && (
                                     <span className="ml-auto bg-red-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full">
-                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                        {pendingReservations > 9 ? '9+' : pendingReservations}
                                     </span>
                                 )}
                                 {item.showAccountBadge && pendingAccounts > 0 && (

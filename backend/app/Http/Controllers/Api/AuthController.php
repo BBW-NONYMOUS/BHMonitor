@@ -37,12 +37,19 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::withTrashed()->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
+        }
+
+        if ($user->trashed()) {
+            return response()->json([
+                'account_status' => 'inactive',
+                'message'        => 'Your account is inactive. Please contact the administrator to restore access.',
+            ], 403);
         }
 
         // Block pending accounts
@@ -94,7 +101,7 @@ class AuthController extends Controller
     public function registerStudent(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'student_no'     => 'required|string|max:50',
+            'student_no'     => 'required|digits_between:1,50',
             'first_name'     => 'required|string|max:255',
             'last_name'      => 'required|string|max:255',
             'email'          => 'required|email|unique:users,email',

@@ -40,6 +40,19 @@ export default function StudentSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    const syncForm = (s) => setForm({
+        first_name:       s.first_name       || '',
+        last_name:        s.last_name        || '',
+        gender:           s.gender           || '',
+        course:           s.course           || '',
+        year_level:       s.year_level       || '',
+        contact_number:   s.contact_number   || '',
+        address:          s.address          || '',
+        parent_name:      s.parent_name      || '',
+        parent_contact:   s.parent_contact   || '',
+        boarding_house_id: s.boarding_house_id ? String(s.boarding_house_id) : '',
+    });
+
     useEffect(() => {
         if (!user?.student_id) {
             setLoading(false);
@@ -52,19 +65,8 @@ export default function StudentSettingsPage() {
         ]).then(([studentRes, bhRes]) => {
             const nextStudent = studentRes.data;
             setStudent(nextStudent);
-            setForm({
-                first_name: nextStudent.first_name || '',
-                last_name: nextStudent.last_name || '',
-                gender: nextStudent.gender || '',
-                course: nextStudent.course || '',
-                year_level: nextStudent.year_level || '',
-                contact_number: nextStudent.contact_number || '',
-                address: nextStudent.address || '',
-                parent_name: nextStudent.parent_name || '',
-                parent_contact: nextStudent.parent_contact || '',
-                boarding_house_id: nextStudent.boarding_house_id ? String(nextStudent.boarding_house_id) : '',
-            });
-            setBoardingHouses(bhRes.data?.data || []);
+            syncForm(nextStudent);
+            setBoardingHouses(bhRes.data?.data || bhRes.data || []);
         }).catch(() => {
             toast.error('Unable to load student settings.');
         }).finally(() => setLoading(false));
@@ -90,14 +92,12 @@ export default function StudentSettingsPage() {
             };
             const { data } = await api.put(`/students/${student.id}`, payload);
             setStudent(data);
-            setForm((current) => ({
-                ...current,
-                boarding_house_id: data.boarding_house_id ? String(data.boarding_house_id) : '',
-            }));
-            toast.success('Student profile updated.');
+            syncForm(data);
+            toast.success('Profile updated successfully.');
         } catch (error) {
-            setErrors(error.response?.data?.errors || {});
-            toast.error(error.response?.data?.message || 'Failed to update student profile.');
+            const errs = error.response?.data?.errors || {};
+            setErrors(errs);
+            toast.error(error.response?.data?.message || 'Failed to update profile.');
         } finally {
             setSaving(false);
         }
@@ -105,6 +105,15 @@ export default function StudentSettingsPage() {
 
     if (loading) {
         return <div className="h-48 animate-pulse rounded-xl bg-slate-200" />;
+    }
+
+    if (!student) {
+        return (
+            <div className="mx-auto max-w-3xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-800">
+                <p className="font-medium">Student profile not found.</p>
+                <p className="mt-1 text-sm">Your account may still be pending setup. Please contact your administrator.</p>
+            </div>
+        );
     }
 
     const approvalStatus = student?.boarding_approval_status || (student?.boarding_house_id ? 'pending' : null);

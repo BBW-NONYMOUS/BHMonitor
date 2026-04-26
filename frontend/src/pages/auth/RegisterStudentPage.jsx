@@ -12,6 +12,7 @@ import { Loader2, ArrowLeft, GraduationCap, CheckCircle, Clock, Camera, X } from
 import { redirectToGoogleAuth } from '@/lib/googleAuth';
 
 const limitContactNumber = (value) => value.replace(/\D/g, '').slice(0, 11);
+const numericOnly = (value) => value.replace(/\D/g, '');
 
 export default function RegisterStudentPage() {
     const { registerStudent } = useAuth();
@@ -70,6 +71,16 @@ export default function RegisterStudentPage() {
     const setContactNumber = (e) => {
         setForm(p => ({ ...p, contact_number: limitContactNumber(e.target.value) }));
         if (errors.contact_number) setErrors(p => ({ ...p, contact_number: null }));
+    };
+
+    const setStudentNo = (e) => {
+        const hasInvalidCharacters = /\D/.test(e.target.value);
+        const value = numericOnly(e.target.value);
+        setForm(p => ({ ...p, student_no: value }));
+        setErrors(p => ({
+            ...p,
+            student_no: hasInvalidCharacters ? ['Student ID must contain numbers only.'] : null,
+        }));
     };
 
     // Handle profile photo selection - REQ-002
@@ -222,7 +233,14 @@ export default function RegisterStudentPage() {
                                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Account Information</h3>
                                 <div className="space-y-1">
                                     <Label>Student ID *</Label>
-                                    <Input placeholder="e.g. 2021-00123" value={form.student_no} onChange={set('student_no')} required />
+                                    <Input
+                                        placeholder="e.g. 202100123"
+                                        value={form.student_no}
+                                        onChange={setStudentNo}
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        required
+                                    />
                                     {errors.student_no && <p className="text-xs text-red-500">{errors.student_no[0]}</p>}
                                 </div>
                                 <div className="space-y-1">
@@ -365,27 +383,6 @@ export default function RegisterStudentPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Boarding House Info */}
-                            <div className="space-y-3 border-t pt-4">
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Boarding House Information</h3>
-                                <div className="space-y-1">
-                                    <Label>Boarding House</Label>
-                                    <Select value={String(form.boarding_house_id || '')} onValueChange={(value) => set('boarding_house_id')(value === 'none' ? '' : value)}>
-                                        <SelectTrigger><SelectValue placeholder="Select your current boarding house" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">No boarding house yet</SelectItem>
-                                            {boardingHouses.map((bh) => (
-                                                <SelectItem key={bh.id} value={String(bh.id)}>
-                                                    {bh.boarding_name}{bh.address ? ` - ${bh.address}` : ''}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.boarding_house_id && <p className="text-xs text-red-500">{errors.boarding_house_id[0]}</p>}
-                                    <p className="text-xs text-slate-500">The selected boarding house owner can accept or reject your registration.</p>
                                 </div>
                             </div>
 

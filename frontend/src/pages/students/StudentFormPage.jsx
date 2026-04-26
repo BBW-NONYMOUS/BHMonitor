@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'];
+const numericOnly = (value) => value.replace(/\D/g, '');
 
 export default function StudentFormPage() {
     const { id } = useParams();
@@ -41,6 +42,15 @@ export default function StudentFormPage() {
     }, [id]);
 
     const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target?.value ?? e }));
+    const setStudentNo = (e) => {
+        const hasInvalidCharacters = /\D/.test(e.target.value);
+        const value = numericOnly(e.target.value);
+        setForm(p => ({ ...p, student_no: value }));
+        setErrors(p => ({
+            ...p,
+            student_no: hasInvalidCharacters ? ['Student ID must contain numbers only.'] : null,
+        }));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -84,7 +94,9 @@ export default function StudentFormPage() {
                                 <Label>Student ID *</Label>
                                 <Input
                                     value={form.student_no}
-                                    onChange={set('student_no')}
+                                    onChange={setStudentNo}
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     required
                                     disabled={isEdit}
                                     className={isEdit ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
